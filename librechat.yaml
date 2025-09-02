@@ -146,8 +146,8 @@ mcpServers:
     startup: true
     chatMenu: true
     serverInstructions: "Use this server for web scraping and browser automation tasks."
-
-    # Notion MCP server - provides Notion workspace integration
+    
+  # Notion MCP server - provides Notion workspace integration
   notion:
     type: stdio
     command: npx
@@ -164,7 +164,7 @@ mcpServers:
       - key: "NOTION_API_KEY"
         label: "Notion Integration Token"
         description: "Your Notion integration token for API access"
-        required: true  
+        required: true
   # Example: Custom MCP server via HTTP/SSE
   # custom-server:
   #   type: sse
