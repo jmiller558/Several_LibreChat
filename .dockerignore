@@ -12,5 +12,9 @@ meili_data*
 
 docs
 
-# Ignore all hidden files
+# Include specific config files for Railway
+!librechat.yaml
+!railway.json
+
+# Ignore all other hidden files
 .*
