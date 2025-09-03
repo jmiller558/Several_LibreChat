@@ -5,7 +5,7 @@
     "dockerfilePath": "Dockerfile.multi"
   },
   "deploy": {
-    "startCommand": "npm run start:api",
+    "startCommand": "npm run backend",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
