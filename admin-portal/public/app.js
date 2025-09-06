@@ -1,863 +1,805 @@
-// Global state
-let currentUser = null;
-let currentPage = 1;
-let usersData = [];
-let filteredUsers = [];
-const PAGE_SIZE = 20;
-const API_BASE_URL = 'http://localhost:4000';
-
-// Handle login button click
-async function handleLoginClick() {
-    alert('handleLoginClick called!');
-    console.log('handleLoginClick called');
-    
-    const loginBtn = document.getElementById('loginBtn');
-    const loginBtnText = document.getElementById('loginBtnText');
-    const loginBtnSpinner = document.getElementById('loginBtnSpinner');
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    console.log('Login attempt:', { email, password: password ? '***' : 'empty' });
-    
-    // Hide error
-    const loginError = document.getElementById('loginError');
-    if (loginError) {
-        loginError.classList.add('hidden');
+class AdminPortal {
+    constructor() {
+        this.token = localStorage.getItem('adminToken');
+        this.currentPage = 1;
+        this.selectedUsers = new Set();
+        this.init();
     }
-    
-    // Show loading state
-    loginBtn.disabled = true;
-    loginBtnText.classList.add('hidden');
-    loginBtnSpinner.classList.remove('hidden');
-    
-    try {
-        await login(email, password);
-    } catch (error) {
-        console.error('handleLoginClick error:', error);
-        showError('Login failed: ' + error.message);
-    } finally {
-        // Reset button state
-        loginBtn.disabled = false;
-        loginBtnText.classList.remove('hidden');
-        loginBtnSpinner.classList.add('hidden');
-    }
-}
 
-// Make function globally accessible
-window.handleLoginClick = handleLoginClick;
-
-// Handle login form submission
-async function handleLogin(event) {
-    event.preventDefault();
-    console.log('handleLogin called');
-    
-    const loginBtn = document.getElementById('loginBtn');
-    const loginBtnText = document.getElementById('loginBtnText');
-    const loginBtnSpinner = document.getElementById('loginBtnSpinner');
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    console.log('Login attempt:', { email, password: password ? '***' : 'empty' });
-    
-    // Hide error
-    document.getElementById('loginError').classList.add('hidden');
-    
-    // Show loading state
-    loginBtn.disabled = true;
-    loginBtnText.classList.add('hidden');
-    loginBtnSpinner.classList.remove('hidden');
-    
-    try {
-        await login(email, password);
-    } catch (error) {
-        console.error('handleLogin error:', error);
-        showError('Login failed: ' + error.message);
-    } finally {
-        // Reset button state
-        loginBtn.disabled = false;
-        loginBtnText.classList.remove('hidden');
-        loginBtnSpinner.classList.add('hidden');
-    }
-}
-
-// Initialize app
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, setting up event listeners');
-    checkAuth();
-    updateTime();
-    setInterval(updateTime, 1000);
-    
-    // Close user menu when clicking outside
-    document.addEventListener('click', function(e) {
-        const userMenu = document.getElementById('userMenu');
-        const userMenuBtn = e.target.closest('button[onclick="toggleUserMenu()"]');
-        
-        if (!userMenuBtn && userMenu && !userMenu.contains(e.target)) {
-            userMenu.classList.add('hidden');
+    init() {
+        if (this.token) {
+            this.verifyToken();
+        } else {
+            this.showLogin();
         }
-    });
-});
 
-// Authentication functions
-async function checkAuth() {
-    const token = localStorage.getItem('adminToken');
-    if (!token) {
-        showLogin();
-        return;
+        this.setupEventListeners();
+        this.setupBulkActions();
     }
 
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`
+    setupEventListeners() {
+        // Login form
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.login();
+        });
+
+        // Logout button
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
+        });
+
+        // Sidebar navigation
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const section = e.currentTarget.dataset.section;
+                this.showSection(section);
+            });
+        });
+
+        // User search and filter
+        document.getElementById('userSearch').addEventListener('input', () => {
+            this.loadUsers();
+        });
+
+        document.getElementById('roleFilter').addEventListener('change', () => {
+            this.loadUsers();
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', () => {
+            this.loadUsers();
+        });
+
+        // Export users
+        document.getElementById('exportUsers').addEventListener('click', () => {
+            this.exportUsers();
+        });
+
+        // Add User modal controls
+        document.getElementById('addUserBtn').addEventListener('click', () => {
+            this.showAddUserModal();
+        });
+
+        document.getElementById('closeAddUserModal').addEventListener('click', () => {
+            this.hideAddUserModal();
+        });
+
+        document.getElementById('cancelAddUser').addEventListener('click', () => {
+            this.hideAddUserModal();
+        });
+
+        // Add User form submission
+        document.getElementById('addUserForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.createUser();
+        });
+
+        // Statistics controls
+        document.getElementById('refreshStats').addEventListener('click', () => {
+            this.loadStatistics();
+        });
+
+        document.getElementById('exportStats').addEventListener('click', () => {
+            this.exportStatistics();
+        });
+
+        // Pagination
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (this.currentPage > 1) {
+                this.currentPage--;
+                this.loadUsers();
             }
         });
 
-        const data = await response.json();
-        
-        if (data.success) {
-            currentUser = data.user;
-            showDashboard();
-            loadDashboardData();
-        } else {
-            localStorage.removeItem('adminToken');
-            showLogin();
-        }
-    } catch (error) {
-        console.error('Auth check failed:', error);
-        localStorage.removeItem('adminToken');
-        showLogin();
-    } finally {
-        showLoading(false);
-    }
-}
-
-async function login(email, password) {
-    try {
-        console.log('login function called with:', { email, password: password ? '***' : 'empty' });
-        showLoading(true);
-        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ email, password })
+        document.getElementById('nextPage').addEventListener('click', () => {
+            this.currentPage++;
+            this.loadUsers();
         });
-
-        console.log('Login response status:', response.status);
-        const data = await response.json();
-        console.log('Login response data:', data);
-        
-        if (data.success) {
-            localStorage.setItem('adminToken', data.token);
-            if (data.refreshToken) {
-                localStorage.setItem('adminRefreshToken', data.refreshToken);
-            }
-            currentUser = data.user;
-            showDashboard();
-            loadDashboardData();
-            showToast('Login successful', 'success');
-        } else {
-            showError(data.message || 'Login failed');
-        }
-    } catch (error) {
-        console.error('Login error:', error);
-        showError('Network error. Please try again.');
-    } finally {
-        showLoading(false);
     }
-}
 
-async function logout() {
-    try {
-        const token = localStorage.getItem('adminToken');
-        if (token) {
-            await fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
+    setupBulkActions() {
+        // Select all checkbox
+        document.getElementById('selectAll').addEventListener('change', (e) => {
+            const checkboxes = document.querySelectorAll('.user-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = e.target.checked;
+                if (e.target.checked) {
+                    this.selectedUsers.add(checkbox.value);
+                } else {
+                    this.selectedUsers.delete(checkbox.value);
                 }
             });
+            this.updateSelectedCount();
+        });
+
+        // Individual checkboxes
+        document.addEventListener('change', (e) => {
+            if (e.target.classList.contains('user-checkbox')) {
+                if (e.target.checked) {
+                    this.selectedUsers.add(e.target.value);
+                } else {
+                    this.selectedUsers.delete(e.target.value);
+                }
+                this.updateSelectedCount();
+            }
+        });
+    }
+
+    updateSelectedCount() {
+        const count = this.selectedUsers.size;
+        document.getElementById('selectedCount').textContent = `${count} selected`;
+        document.getElementById('bulkActions').classList.toggle('hidden', count === 0);
+    }
+
+    async login() {
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        const errorDiv = document.getElementById('loginError');
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.token = data.token;
+                localStorage.setItem('adminToken', this.token);
+                this.showMainApp(data.user);
+            } else {
+                errorDiv.textContent = data.error;
+                errorDiv.classList.remove('hidden');
+            }
+        } catch (error) {
+            errorDiv.textContent = 'Login failed. Please try again.';
+            errorDiv.classList.remove('hidden');
         }
-    } catch (error) {
-        console.error('Logout error:', error);
-    } finally {
+    }
+
+    async verifyToken() {
+        try {
+            const response = await fetch('/api/auth/verify', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.showMainApp(data.user);
+            } else {
+                this.logout();
+            }
+        } catch (error) {
+            this.logout();
+        }
+    }
+
+    logout() {
         localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminRefreshToken');
-        currentUser = null;
-        showLogin();
-        showToast('Logged out successfully', 'info');
+        this.token = null;
+        this.showLogin();
     }
-}
 
-// UI Display functions
-function showLogin() {
-    document.getElementById('loginModal').classList.remove('hidden');
-    document.getElementById('dashboard').classList.add('hidden');
-}
-
-function showDashboard() {
-    document.getElementById('loginModal').classList.add('hidden');
-    document.getElementById('dashboard').classList.remove('hidden');
-    document.getElementById('adminName').textContent = currentUser.name;
-    showSection('overview');
-}
-
-function showLoading(show) {
-    const loader = document.getElementById('loading');
-    if (show) {
-        loader.classList.remove('hidden');
-    } else {
-        loader.classList.add('hidden');
+    showLogin() {
+        document.getElementById('loginModal').classList.remove('hidden');
+        document.getElementById('mainApp').classList.add('hidden');
     }
-}
 
-function showError(message) {
-    const errorDiv = document.getElementById('loginError');
-    const errorMsg = errorDiv.querySelector('p');
-    errorMsg.textContent = message;
-    errorDiv.classList.remove('hidden');
-    setTimeout(() => {
-        errorDiv.classList.add('hidden');
-    }, 5000);
-}
-
-function showToast(message, type = 'info') {
-    const toast = document.getElementById('toast');
-    const icon = document.getElementById('toastIcon');
-    const msgEl = document.getElementById('toastMessage');
-    
-    msgEl.textContent = message;
-    
-    // Set icon based on type
-    icon.innerHTML = '';
-    if (type === 'success') {
-        icon.innerHTML = '<i class="fas fa-check-circle text-green-500"></i>';
-    } else if (type === 'error') {
-        icon.innerHTML = '<i class="fas fa-exclamation-circle text-red-500"></i>';
-    } else if (type === 'warning') {
-        icon.innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500"></i>';
-    } else {
-        icon.innerHTML = '<i class="fas fa-info-circle text-blue-500"></i>';
-    }
-    
-    toast.classList.remove('hidden');
-    setTimeout(() => {
-        toast.classList.add('hidden');
-    }, 5000);
-}
-
-function hideToast() {
-    document.getElementById('toast').classList.add('hidden');
-}
-
-// Navigation functions
-function showSection(section) {
-    // Hide all sections
-    document.querySelectorAll('.section').forEach(el => {
-        el.classList.add('hidden');
-    });
-    
-    // Show selected section
-    document.getElementById(`${section}-section`).classList.remove('hidden');
-    
-    // Update navigation
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.classList.remove('text-primary-600', 'border-b-2', 'border-primary-600');
-        btn.classList.add('text-gray-500', 'hover:text-gray-700');
-    });
-    
-    const activeBtn = document.getElementById(`nav-${section}`);
-    activeBtn.classList.remove('text-gray-500', 'hover:text-gray-700');
-    activeBtn.classList.add('text-primary-600', 'border-b-2', 'border-primary-600');
-    
-    // Load section data
-    if (section === 'users') {
-        loadUsers();
-    } else if (section === 'stats') {
-        loadStatistics();
-    }
-}
-
-function toggleUserMenu() {
-    const menu = document.getElementById('userMenu');
-    menu.classList.toggle('hidden');
-}
-
-// Dashboard data loading
-async function loadDashboardData() {
-    try {
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch('/api/dashboard/stats', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
+    showMainApp(user) {
+        document.getElementById('loginModal').classList.add('hidden');
+        document.getElementById('mainApp').classList.remove('hidden');
+        document.getElementById('userInfo').textContent = `Welcome, ${user.name}`;
         
-        if (data.success) {
-            updateDashboardStats(data.data);
-        }
-    } catch (error) {
-        console.error('Dashboard load error:', error);
+        this.loadDashboard();
     }
-    
-    // Load additional data
-    loadRecentActivity();
-    loadSystemHealth();
-}
 
-function updateDashboardStats(stats) {
-    document.getElementById('totalUsers').textContent = stats.users.total.toLocaleString();
-    document.getElementById('totalConversations').textContent = stats.conversations.total.toLocaleString();
-    document.getElementById('totalMessages').textContent = stats.messages.total.toLocaleString();
-    document.getElementById('totalAdmins').textContent = stats.users.admins.toLocaleString();
-}
-
-async function loadRecentActivity() {
-    try {
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch('/api/dashboard/recent-activity?limit=5', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
+    showSection(section) {
+        // Hide all sections
+        document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
         
-        if (data.success) {
-            updateRecentUsers(data.data.recentUsers);
-        }
-    } catch (error) {
-        console.error('Recent activity load error:', error);
-        document.getElementById('recentUsers').innerHTML = '<div class="text-center text-red-500 py-4">Failed to load recent users</div>';
-    }
-}
-
-function updateRecentUsers(users) {
-    const container = document.getElementById('recentUsers');
-    
-    if (users.length === 0) {
-        container.innerHTML = '<div class="text-center text-gray-500 py-4">No recent users</div>';
-        return;
-    }
-    
-    container.innerHTML = users.map(user => `
-        <div class="flex items-center justify-between">
-            <div class="flex items-center">
-                <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                    <i class="fas fa-user text-primary-600 text-sm"></i>
-                </div>
-                <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-900">${escapeHtml(user.name)}</p>
-                    <p class="text-xs text-gray-500">${escapeHtml(user.email)}</p>
-                </div>
-            </div>
-            <div class="text-right">
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}">
-                    ${user.role}
-                </span>
-                <p class="text-xs text-gray-500 mt-1">${formatDate(user.createdAt)}</p>
-            </div>
-        </div>
-    `).join('');
-}
-
-async function loadSystemHealth() {
-    try {
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch('/api/dashboard/health', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
+        // Remove active class from all sidebar items
+        document.querySelectorAll('.sidebar-item').forEach(item => 
+            item.classList.remove('active'));
         
-        if (data.success) {
-            updateSystemHealth(data.data);
-        }
-    } catch (error) {
-        console.error('System health load error:', error);
-        document.getElementById('systemHealth').innerHTML = '<div class="text-center text-red-500 py-4">Failed to load system health</div>';
-    }
-}
-
-function updateSystemHealth(health) {
-    const container = document.getElementById('systemHealth');
-    
-    const statusColor = health.status === 'healthy' ? 'text-green-600' : 
-                       health.status === 'warning' ? 'text-yellow-600' : 'text-red-600';
-    
-    container.innerHTML = `
-        <div class="space-y-3">
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Status</span>
-                <span class="text-sm font-medium ${statusColor} capitalize">${health.status}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Uptime</span>
-                <span class="text-sm font-medium text-gray-900">${health.uptime.formatted}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Memory</span>
-                <span class="text-sm font-medium text-gray-900">${health.memory.heapUsed}MB / ${health.memory.heapTotal}MB</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Database</span>
-                <span class="text-sm font-medium ${health.database.connected ? 'text-green-600' : 'text-red-600'}">
-                    ${health.database.status}
-                </span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Node.js</span>
-                <span class="text-sm font-medium text-gray-900">${health.node.version}</span>
-            </div>
-        </div>
-    `;
-}
-
-// User management functions
-async function loadUsers() {
-    try {
-        showLoading(true);
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch(`/api/users?page=${currentPage}&limit=${PAGE_SIZE}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
+        // Show selected section
+        document.getElementById(`${section}-section`).classList.remove('hidden');
         
-        if (data.success) {
-            usersData = data.data.users;
-            filteredUsers = [...usersData];
-            updateUsersTable();
-            updatePagination(data.data.pagination);
-        } else {
-            showToast('Failed to load users', 'error');
-        }
-    } catch (error) {
-        console.error('Load users error:', error);
-        showToast('Network error loading users', 'error');
-    } finally {
-        showLoading(false);
-    }
-}
+        // Add active class to clicked sidebar item
+        document.querySelector(`[data-section="${section}"]`).classList.add('active');
 
-function updateUsersTable() {
-    const tbody = document.getElementById('usersTableBody');
-    
-    if (filteredUsers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No users found</td></tr>';
-        return;
+        // Load section content
+        switch (section) {
+            case 'dashboard':
+                this.loadDashboard();
+                break;
+            case 'users':
+                this.loadUsers();
+                break;
+            case 'security':
+                this.loadSecurityDashboard();
+                break;
+            case 'statistics':
+                this.loadStatistics();
+                break;
+            case 'database':
+                this.loadDatabase();
+                break;
+        }
     }
-    
-    tbody.innerHTML = filteredUsers.map(user => `
-        <tr class="hover:bg-gray-50">
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center">
-                    <div class="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                        <i class="fas fa-user text-primary-600"></i>
+
+    async loadDashboard() {
+        try {
+            const response = await fetch('/api/admin/stats', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const stats = await response.json();
+                
+                // Update overview stats
+                document.getElementById('totalUsers').textContent = stats.overview.totalUsers || 0;
+                document.getElementById('activeUsers').textContent = stats.overview.activeUsers || 0;
+                document.getElementById('totalConversations').textContent = stats.overview.totalConversations || 0;
+                document.getElementById('totalMessages').textContent = stats.overview.totalMessages || 0;
+                
+                // Update growth stats
+                document.getElementById('newUsersToday').textContent = stats.userGrowth.today || 0;
+                document.getElementById('newUsersWeek').textContent = stats.userGrowth.thisWeek || 0;
+                document.getElementById('newUsersMonth').textContent = stats.userGrowth.thisMonth || 0;
+            }
+        } catch (error) {
+            console.error('Failed to load dashboard stats:', error);
+        }
+    }
+
+    async loadUsers() {
+        const search = document.getElementById('userSearch').value;
+        const role = document.getElementById('roleFilter').value;
+        const status = document.getElementById('statusFilter').value;
+        
+        try {
+            const params = new URLSearchParams({
+                page: this.currentPage,
+                search,
+                role,
+                status,
+            });
+
+            const response = await fetch(`/api/admin/users?${params}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.renderUsers(data.users);
+                this.renderPagination(data.pagination);
+            }
+        } catch (error) {
+            console.error('Failed to load users:', error);
+        }
+    }
+
+    renderUsers(users) {
+        const tbody = document.getElementById('usersTable');
+        tbody.innerHTML = '';
+
+        users.forEach(user => {
+            const row = document.createElement('tr');
+            const lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never';
+            const status = user.banned ? 'Banned' : (!user.emailVerified ? 'Unverified' : 'Active');
+            const statusClass = user.banned ? 'bg-red-100 text-red-800' : 
+                               (!user.emailVerified ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800');
+
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <input type="checkbox" class="user-checkbox rounded" value="${user._id}">
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="ml-4">
+                            <div class="text-sm font-medium text-gray-900">${user.name || 'N/A'}</div>
+                            <div class="text-sm text-gray-500">${user.email}</div>
+                            ${user.twoFactorEnabled ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800"><i class="fas fa-shield-alt mr-1"></i>2FA</span>' : ''}
+                        </div>
                     </div>
-                    <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-900">${escapeHtml(user.name)}</div>
-                        <div class="text-sm text-gray-500">${escapeHtml(user.email)}</div>
-                    </div>
-                </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}">
-                    ${user.role}
-                </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center">
-                    ${user.banned ? 
-                        '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Banned</span>' :
-                        '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>'
-                    }
-                    ${user.emailVerified ? 
-                        '<i class="fas fa-check-circle text-green-500 ml-2" title="Email Verified"></i>' :
-                        '<i class="fas fa-exclamation-circle text-yellow-500 ml-2" title="Email Not Verified"></i>'
-                    }
-                </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                <div>
-                    <div>${user.conversationCount || 0} conversations</div>
-                    <div>${user.messageCount || 0} messages</div>
-                    <div class="text-xs">Last login: ${user.lastLogin ? formatDate(user.lastLogin) : 'Never'}</div>
-                </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <div class="flex space-x-2">
-                    ${user.role !== 'ADMIN' ? 
-                        `<button onclick="makeAdmin('${user._id}')" class="text-purple-600 hover:text-purple-900" title="Make Admin">
-                            <i class="fas fa-user-shield"></i>
-                        </button>` : 
-                        `<button onclick="removeAdmin('${user._id}')" class="text-gray-400 hover:text-gray-600" title="Remove Admin" ${user._id === currentUser.id ? 'disabled' : ''}>
-                            <i class="fas fa-user-minus"></i>
-                        </button>`
-                    }
-                    ${!user.banned ? 
-                        `<button onclick="banUser('${user._id}')" class="text-red-600 hover:text-red-900" title="Ban User" ${user._id === currentUser.id ? 'disabled' : ''}>
-                            <i class="fas fa-ban"></i>
-                        </button>` : 
-                        `<button onclick="unbanUser('${user._id}')" class="text-green-600 hover:text-green-900" title="Unban User">
-                            <i class="fas fa-check-circle"></i>
-                        </button>`
-                    }
-                    <button onclick="deleteUser('${user._id}')" class="text-red-600 hover:text-red-900" title="Delete User" ${user._id === currentUser.id ? 'disabled' : ''}>
-                        <i class="fas fa-trash"></i>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        user.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                    }">
+                        ${user.role}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                        ${status}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${lastLogin}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${new Date(user.createdAt).toLocaleDateString()}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button onclick="adminPortal.toggleUserRole('${user._id}', '${user.role}')" 
+                            class="text-blue-600 hover:text-blue-900 mr-3">
+                        ${user.role === 'ADMIN' ? 'Remove Admin' : 'Make Admin'}
                     </button>
+                    <button onclick="adminPortal.toggleUserBan('${user._id}', ${user.banned})" 
+                            class="text-yellow-600 hover:text-yellow-900 mr-3">
+                        ${user.banned ? 'Unban' : 'Ban'}
+                    </button>
+                    <button onclick="adminPortal.deleteUser('${user._id}')" 
+                            class="text-red-600 hover:text-red-900">
+                        Delete
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    renderPagination(pagination) {
+        document.getElementById('usersInfo').textContent = 
+            `Showing ${pagination.totalUsers > 0 ? ((pagination.currentPage - 1) * 10) + 1 : 0} to ${Math.min(pagination.currentPage * 10, pagination.totalUsers)} of ${pagination.totalUsers} users`;
+        
+        document.getElementById('pageInfo').textContent = 
+            `Page ${pagination.currentPage} of ${pagination.totalPages}`;
+        
+        document.getElementById('prevPage').disabled = !pagination.hasPrev;
+        document.getElementById('nextPage').disabled = !pagination.hasNext;
+    }
+
+    async toggleUserRole(userId, currentRole) {
+        const newRole = currentRole === 'ADMIN' ? 'USER' : 'ADMIN';
+        
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/role`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ role: newRole }),
+            });
+
+            if (response.ok) {
+                this.loadUsers();
+            } else {
+                alert('Failed to update user role');
+            }
+        } catch (error) {
+            alert('Failed to update user role');
+        }
+    }
+
+    async toggleUserBan(userId, currentlyBanned) {
+        try {
+            const response = await fetch(`/api/admin/users/${userId}/ban`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                this.loadUsers();
+            } else {
+                alert('Failed to update user status');
+            }
+        } catch (error) {
+            alert('Failed to update user status');
+        }
+    }
+
+    async deleteUser(userId) {
+        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/users/${userId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                this.loadUsers();
+            } else {
+                alert('Failed to delete user');
+            }
+        } catch (error) {
+            alert('Failed to delete user');
+        }
+    }
+
+    // Bulk Operations
+    async bulkAction(action, params = {}) {
+        if (this.selectedUsers.size === 0) {
+            alert('Please select users first');
+            return;
+        }
+
+        const userIds = Array.from(this.selectedUsers);
+        const confirmMessage = `Are you sure you want to ${action} ${userIds.length} user(s)?`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/admin/users/bulk/${action}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ userIds, ...params }),
+            });
+
+            if (response.ok) {
+                this.selectedUsers.clear();
+                this.updateSelectedCount();
+                document.getElementById('selectAll').checked = false;
+                this.loadUsers();
+                alert(`Successfully ${action}ed ${userIds.length} user(s)`);
+            } else {
+                const error = await response.json();
+                alert(`Failed to ${action} users: ${error.error}`);
+            }
+        } catch (error) {
+            alert(`Failed to ${action} users`);
+        }
+    }
+
+    // Export Users
+    async exportUsers() {
+        try {
+            const response = await fetch('/api/admin/users/export', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                alert('Failed to export users');
+            }
+        } catch (error) {
+            alert('Failed to export users');
+        }
+    }
+
+    // Add User Modal Methods
+    showAddUserModal() {
+        document.getElementById('addUserModal').classList.remove('hidden');
+        document.getElementById('addUserForm').reset();
+        document.getElementById('addUserError').classList.add('hidden');
+    }
+
+    hideAddUserModal() {
+        document.getElementById('addUserModal').classList.add('hidden');
+        document.getElementById('addUserForm').reset();
+        document.getElementById('addUserError').classList.add('hidden');
+    }
+
+    async createUser() {
+        const formData = new FormData(document.getElementById('addUserForm'));
+        const userData = {
+            name: formData.get('name'),
+            email: formData.get('email'),
+            password: formData.get('password'),
+            role: formData.get('role'),
+            emailVerified: formData.get('emailVerified') === 'on'
+        };
+
+        const errorDiv = document.getElementById('addUserError');
+
+        try {
+            const response = await fetch('/api/admin/users/create', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(userData),
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                this.hideAddUserModal();
+                this.loadUsers(); // Refresh the user list
+                alert(`User "${userData.name}" created successfully!`);
+            } else {
+                errorDiv.textContent = result.error || 'Failed to create user';
+                errorDiv.classList.remove('hidden');
+            }
+        } catch (error) {
+            errorDiv.textContent = 'Failed to create user. Please try again.';
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    // Security Dashboard
+    async loadSecurityDashboard() {
+        try {
+            const response = await fetch('/api/admin/security/audit', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Update security stats
+                document.getElementById('bannedUsers').textContent = data.stats.bannedUsers;
+                document.getElementById('unverifiedUsers').textContent = data.stats.unverifiedUsers;
+                document.getElementById('twoFactorUsers').textContent = data.stats.twoFactorUsers;
+                document.getElementById('verificationRate').textContent = `${data.stats.verificationRate}%`;
+                document.getElementById('adminCount').textContent = data.stats.adminUsers;
+                document.getElementById('activeSessions').textContent = data.stats.activeSessions;
+
+                // Render security events
+                this.renderSecurityEvents(data.recentEvents);
+            }
+        } catch (error) {
+            console.error('Failed to load security data:', error);
+        }
+    }
+
+    renderSecurityEvents(events) {
+        const container = document.getElementById('securityEvents');
+        
+        if (!events || events.length === 0) {
+            container.innerHTML = '<p class="text-gray-500">No recent security events</p>';
+            return;
+        }
+
+        container.innerHTML = events.map(event => `
+            <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded">
+                <div class="flex-shrink-0">
+                    <div class="w-2 h-2 rounded-full ${
+                        event.type === 'ban' ? 'bg-red-500' :
+                        event.type === 'login_attempt' ? 'bg-yellow-500' :
+                        event.type === 'role_change' ? 'bg-blue-500' : 'bg-gray-500'
+                    }"></div>
                 </div>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function updatePagination(pagination) {
-    document.getElementById('usersStart').textContent = pagination.currentPage === 1 ? 1 : ((pagination.currentPage - 1) * PAGE_SIZE) + 1;
-    document.getElementById('usersEnd').textContent = Math.min(pagination.currentPage * PAGE_SIZE, pagination.totalUsers);
-    document.getElementById('usersTotal').textContent = pagination.totalUsers;
-    
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    
-    if (pagination.hasPrev) {
-        prevBtn.disabled = false;
-        prevBtn.classList.remove('cursor-not-allowed', 'bg-gray-100', 'text-gray-500');
-        prevBtn.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-50');
-    } else {
-        prevBtn.disabled = true;
-        prevBtn.classList.add('cursor-not-allowed', 'bg-gray-100', 'text-gray-500');
-        prevBtn.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-50');
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900">${event.description}</p>
+                    <p class="text-xs text-gray-500">${new Date(event.timestamp).toLocaleString()}</p>
+                </div>
+            </div>
+        `).join('');
     }
-    
-    if (pagination.hasNext) {
-        nextBtn.disabled = false;
-        nextBtn.classList.remove('cursor-not-allowed', 'bg-gray-100', 'text-gray-500');
-        nextBtn.classList.add('bg-white', 'text-gray-700', 'hover:bg-gray-50');
-    } else {
-        nextBtn.disabled = true;
-        nextBtn.classList.add('cursor-not-allowed', 'bg-gray-100', 'text-gray-500');
-        nextBtn.classList.remove('bg-white', 'text-gray-700', 'hover:bg-gray-50');
-    }
-}
 
-// User actions
-async function makeAdmin(userId) {
-    if (!confirm('Are you sure you want to make this user an admin?')) return;
-    
-    try {
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch(`/api/users/${userId}/make-admin`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
+    loadStatistics() {
+        this.loadDetailedStatistics();
+    }
+
+    async loadDetailedStatistics() {
+        try {
+            const response = await fetch('/api/admin/statistics', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const stats = await response.json();
+                this.renderStatistics(stats);
+                this.renderCharts(stats.charts);
+            } else {
+                console.error('Failed to load statistics');
+            }
+        } catch (error) {
+            console.error('Error loading statistics:', error);
+        }
+    }
+
+    renderStatistics(stats) {
+        // Update overview metrics
+        document.getElementById('statsTotalUsers').textContent = stats.overview.totalUsers.toLocaleString();
+        document.getElementById('statsTotalMessages').textContent = stats.overview.totalMessages.toLocaleString();
+        document.getElementById('statsTotalConversations').textContent = stats.overview.totalConversations.toLocaleString();
+        document.getElementById('statsActiveUsers').textContent = stats.overview.activeUsers.toLocaleString();
+
+        // Update growth percentages
+        document.getElementById('statsUserGrowth').textContent = stats.growth.userGrowth;
+        document.getElementById('statsMessageGrowth').textContent = stats.growth.messageGrowth;
+        document.getElementById('statsConversationGrowth').textContent = stats.growth.conversationGrowth;
+        document.getElementById('statsActiveGrowth').textContent = stats.growth.activeGrowth;
+
+        // Update user statistics
+        document.getElementById('statsRegisteredUsers').textContent = stats.users.registered.toLocaleString();
+        document.getElementById('statsVerifiedUsers').textContent = stats.users.verified.toLocaleString();
+        document.getElementById('statsAdminUsers').textContent = stats.users.admin.toLocaleString();
+        document.getElementById('statsBannedUsers').textContent = stats.users.banned.toLocaleString();
+        document.getElementById('stats2FAUsers').textContent = stats.users.twoFactor.toLocaleString();
+        document.getElementById('statsRecentLogins').textContent = stats.users.recentLogins.toLocaleString();
+
+        // Update performance metrics
+        document.getElementById('statsAvgMessages').textContent = stats.performance.avgMessagesPerUser;
+        document.getElementById('statsAvgConversations').textContent = stats.performance.avgConversationsPerUser;
+        document.getElementById('statsPeakHour').textContent = stats.performance.peakHour;
+        document.getElementById('statsDatabaseSize').textContent = stats.performance.databaseSize;
+        document.getElementById('statsStorageUsed').textContent = stats.performance.storageUsed;
+        
+        // Format uptime
+        const uptime = stats.performance.uptime;
+        const days = Math.floor(uptime / 86400);
+        const hours = Math.floor((uptime % 86400) / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        document.getElementById('statsUptime').textContent = `${days}d ${hours}h ${minutes}m`;
+
+        // Update last updated time
+        document.getElementById('statsLastUpdated').textContent = new Date(stats.lastUpdated).toLocaleString();
+    }
+
+    renderCharts(chartData) {
+        // User Growth Chart
+        const userGrowthCtx = document.getElementById('userGrowthChart').getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (this.userGrowthChart) {
+            this.userGrowthChart.destroy();
+        }
+
+        this.userGrowthChart = new Chart(userGrowthCtx, {
+            type: 'line',
+            data: {
+                labels: chartData.userGrowth.map(item => item.date),
+                datasets: [{
+                    label: 'New Users',
+                    data: chartData.userGrowth.map(item => item.count),
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
             }
         });
 
-        const data = await response.json();
+        // Message Activity Chart
+        const messageActivityCtx = document.getElementById('messageActivityChart').getContext('2d');
         
-        if (data.success) {
-            showToast(data.message, 'success');
-            loadUsers();
-        } else {
-            showToast(data.message || 'Failed to make user admin', 'error');
+        // Destroy existing chart if it exists
+        if (this.messageActivityChart) {
+            this.messageActivityChart.destroy();
         }
-    } catch (error) {
-        console.error('Make admin error:', error);
-        showToast('Network error', 'error');
-    }
-}
 
-async function removeAdmin(userId) {
-    if (!confirm('Are you sure you want to remove admin privileges from this user?')) return;
-    
-    try {
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch(`/api/users/${userId}/remove-admin`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
+        this.messageActivityChart = new Chart(messageActivityCtx, {
+            type: 'bar',
+            data: {
+                labels: chartData.messageActivity.map(item => item.date),
+                datasets: [{
+                    label: 'Messages',
+                    data: chartData.messageActivity.map(item => item.count),
+                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                    borderColor: 'rgb(16, 185, 129)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
             }
         });
-
-        const data = await response.json();
-        
-        if (data.success) {
-            showToast(data.message, 'success');
-            loadUsers();
-        } else {
-            showToast(data.message || 'Failed to remove admin privileges', 'error');
-        }
-    } catch (error) {
-        console.error('Remove admin error:', error);
-        showToast('Network error', 'error');
     }
-}
 
-async function banUser(userId) {
-    if (!confirm('Are you sure you want to ban this user?')) return;
-    
-    try {
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch(`/api/users/${userId}/ban`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
+    async exportStatistics() {
+        try {
+            const response = await fetch('/api/admin/statistics/export', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `statistics_report_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                alert('Failed to export statistics');
             }
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-            showToast(data.message, 'success');
-            loadUsers();
-        } else {
-            showToast(data.message || 'Failed to ban user', 'error');
+        } catch (error) {
+            alert('Failed to export statistics');
         }
-    } catch (error) {
-        console.error('Ban user error:', error);
-        showToast('Network error', 'error');
     }
-}
 
-async function unbanUser(userId) {
-    if (!confirm('Are you sure you want to unban this user?')) return;
-    
-    try {
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch(`/api/users/${userId}/unban`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
+    async loadDatabase() {
+        try {
+            const response = await fetch('/api/admin/database/info', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('databaseInfo').innerHTML = `
+                    <h3 class="text-lg font-semibold mb-4">Database Information</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="font-medium">Database Stats</h4>
+                            <p>Data Size: ${(data.database.dataSize / 1024 / 1024).toFixed(2)} MB</p>
+                            <p>Index Size: ${(data.database.indexSize / 1024 / 1024).toFixed(2)} MB</p>
+                            <p>Objects: ${data.database.objects}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-medium">Collections</h4>
+                            <ul class="list-disc list-inside">
+                                ${data.collections.map(col => `<li>${col}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `;
             }
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-            showToast(data.message, 'success');
-            loadUsers();
-        } else {
-            showToast(data.message || 'Failed to unban user', 'error');
+        } catch (error) {
+            console.error('Failed to load database info:', error);
         }
-    } catch (error) {
-        console.error('Unban user error:', error);
-        showToast('Network error', 'error');
     }
 }
 
-async function deleteUser(userId) {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone and will delete all their conversations and messages.')) return;
-    
-    try {
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch(`/api/users/${userId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-            showToast(data.message, 'success');
-            loadUsers();
-        } else {
-            showToast(data.message || 'Failed to delete user', 'error');
-        }
-    } catch (error) {
-        console.error('Delete user error:', error);
-        showToast('Network error', 'error');
-    }
-}
-
-// Filtering and pagination
-function filterUsers() {
-    const search = document.getElementById('userSearch').value.toLowerCase();
-    const role = document.getElementById('roleFilter').value;
-    const status = document.getElementById('statusFilter').value;
-    
-    filteredUsers = usersData.filter(user => {
-        const matchesSearch = user.name.toLowerCase().includes(search) || 
-                             user.email.toLowerCase().includes(search);
-        const matchesRole = role === 'all' || user.role === role;
-        
-        let matchesStatus = true;
-        if (status === 'banned') {
-            matchesStatus = user.banned === true;
-        } else if (status === 'active') {
-            matchesStatus = user.banned === false;
-        } else if (status === 'verified') {
-            matchesStatus = user.emailVerified === true;
-        } else if (status === 'unverified') {
-            matchesStatus = user.emailVerified === false;
-        }
-        
-        return matchesSearch && matchesRole && matchesStatus;
-    });
-    
-    updateUsersTable();
-}
-
-function clearFilters() {
-    document.getElementById('userSearch').value = '';
-    document.getElementById('roleFilter').value = 'all';
-    document.getElementById('statusFilter').value = 'all';
-    filteredUsers = [...usersData];
-    updateUsersTable();
-}
-
-function refreshUsers() {
-    loadUsers();
-}
-
-function previousPage() {
-    if (currentPage > 1) {
-        currentPage--;
-        loadUsers();
-    }
-}
-
-function nextPage() {
-    currentPage++;
-    loadUsers();
-}
-
-// Statistics loading
-async function loadStatistics() {
-    try {
-        const token = localStorage.getItem('adminToken');
-        const [statsResponse, modelsResponse] = await Promise.all([
-            fetch('/api/dashboard/stats', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            }),
-            fetch('/api/dashboard/popular-models', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-        ]);
-
-        const [statsData, modelsData] = await Promise.all([
-            statsResponse.json(),
-            modelsResponse.json()
-        ]);
-        
-        if (statsData.success) {
-            updateUserStatistics(statsData.data.users);
-            updateMessageStatistics(statsData.data.messages);
-        }
-    } catch (error) {
-        console.error('Statistics load error:', error);
-    }
-}
-
-function updateUserStatistics(stats) {
-    const container = document.getElementById('userStats');
-    container.innerHTML = `
-        <div class="space-y-3">
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Total Users</span>
-                <span class="text-sm font-medium text-gray-900">${stats.total.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Admins</span>
-                <span class="text-sm font-medium text-gray-900">${stats.admins.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Banned</span>
-                <span class="text-sm font-medium text-gray-900">${stats.banned.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Verified</span>
-                <span class="text-sm font-medium text-gray-900">${stats.verified.toLocaleString()} (${stats.verificationRate}%)</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">New Today</span>
-                <span class="text-sm font-medium text-gray-900">${stats.newToday.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">New This Week</span>
-                <span class="text-sm font-medium text-gray-900">${stats.newThisWeek.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Active This Week</span>
-                <span class="text-sm font-medium text-gray-900">${stats.activeLastWeek.toLocaleString()}</span>
-            </div>
-        </div>
-    `;
-}
-
-function updateMessageStatistics(stats) {
-    const container = document.getElementById('messageStats');
-    container.innerHTML = `
-        <div class="space-y-3">
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Total Messages</span>
-                <span class="text-sm font-medium text-gray-900">${stats.total.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">User Messages</span>
-                <span class="text-sm font-medium text-gray-900">${stats.userMessages.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Assistant Messages</span>
-                <span class="text-sm font-medium text-gray-900">${stats.assistantMessages.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Error Messages</span>
-                <span class="text-sm font-medium text-gray-900">${stats.errorMessages.toLocaleString()} (${stats.errorRate}%)</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">New Today</span>
-                <span class="text-sm font-medium text-gray-900">${stats.newToday.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">New This Week</span>
-                <span class="text-sm font-medium text-gray-900">${stats.newThisWeek.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-sm text-gray-600">Total Tokens</span>
-                <span class="text-sm font-medium text-gray-900">${stats.tokens.total.toLocaleString()}</span>
-            </div>
-        </div>
-    `;
-}
-
-// Utility functions
-function updateTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-    const currentTimeEl = document.getElementById('currentTime');
-    if (currentTimeEl) {
-        currentTimeEl.textContent = timeString;
-    }
-}
-
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+// Initialize the admin portal
+const adminPortal = new AdminPortal();
