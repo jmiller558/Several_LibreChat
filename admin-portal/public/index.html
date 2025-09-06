@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LibreChat Admin Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9fafb;
+            min-height: 100vh;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Test indicator -->
+    <div id="testIndicator" style="position: fixed; top: 10px; right: 10px; background: green; color: white; padding: 5px 10px; border-radius: 4px; z-index: 9999;">
+        Page Loaded!
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md mx-4">
+            <div class="text-center mb-8">
+                <h2 class="text-2xl font-bold text-gray-900">Admin Portal</h2>
+                <p class="text-gray-600 mt-2">Sign in to access the dashboard</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input type="email" id="email" name="email" required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                </div>
+                
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="password" name="password" required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                </div>
+                
+                <button type="submit" id="loginBtn"
+                        class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700">
+                    Sign In
+                </button>
+            </form>
+            
+            <div id="loginError" class="hidden mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p class="text-red-600 text-sm">Error message will appear here</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        console.log('HTML loaded successfully!');
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM ready');
+        });
+    </script>
+</body>
+</html>
