@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "start": "node railway-start.js",
     "update": "node config/update.js",
     "add-balance": "node config/add-balance.js",
     "set-balance": "node config/set-balance.js",
@@ -58,6 +59,13 @@
     "e2e:update": "playwright test --config=e2e/playwright.config.js --update-snapshots",
     "e2e:report": "npx playwright show-report e2e/playwright-report",
     "lint:fix": "eslint --fix \"{,!(node_modules|venv)/**/}*.{js,jsx,ts,tsx}\"",
+    "admin:start": "cd admin && npm start",
+    "admin:dev": "cd admin && npm run dev",
+    "admin:install": "cd admin && npm install",
+    "admin:create": "cd admin && npm run create-admin",
+    "railway:start": "node railway-start.js",
+    "railway:admin": "START_ADMIN_PORTAL=true node railway-start.js",
+    "railway:librechat": "npm run backend",
     "lint": "eslint \"{,!(node_modules|venv)/**/}*.{js,jsx,ts,tsx}\"",
     "format": "npx prettier --write \"{,!(node_modules|venv)/**/}*.{js,jsx,ts,tsx}\"",
     "b:api": "NODE_ENV=production bun run api/server/index.js",
