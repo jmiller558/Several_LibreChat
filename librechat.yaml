@@ -7,10 +7,6 @@
 # Configuration version (required)
 version: 1.2.1
 
-# Railway deployment settings
-host: '0.0.0.0'
-port: ${PORT:-3080}
-
 # Cache settings: Set to true to enable caching
 cache: true
 
@@ -152,22 +148,23 @@ mcpServers:
     serverInstructions: "Use this server for web scraping and browser automation tasks."
     
   # Notion MCP server - provides Notion workspace integration
-  # Note: If you have a notion MCP server running as a service, use SSE type with url
-  # For now, commenting out the notion server to resolve validation errors
-  # notion:
-  #   type: sse
-  #   url: http://localhost:3001/notion
-  #   timeout: 60000
-  #   startup: true
-  #   chatMenu: true
-  #   serverInstructions: "Use this server to read, write, and manage your Notion pages and databases."
-  #   env:
-  #     NOTION_API_KEY: ${NOTION_API_KEY}
-  #   customUserVars:
-  #     - key: "NOTION_API_KEY"
-  #       label: "Notion Integration Token"
-  #       description: "Your Notion integration token for API access"
-  #       required: true
+  notion:
+    type: stdio
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-notion"
+    timeout: 60000
+    startup: true
+    chatMenu: true
+    serverInstructions: "Use this server to read, write, and manage your Notion pages and databases."
+    env:
+      NOTION_API_KEY: ${NOTION_API_KEY}
+    customUserVars:
+      - key: "NOTION_API_KEY"
+        label: "Notion Integration Token"
+        description: "Your Notion integration token for API access"
+        required: true
   # Example: Custom MCP server via HTTP/SSE
   # custom-server:
   #   type: sse
