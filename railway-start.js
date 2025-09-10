@@ -1,46 +1,51 @@
 const { spawn } = require('child_process');
+const path = require('path');
 
-console.log('🚀 Starting Several Chat Production Server...');
+console.log('🚀 Starting LibreChat with Railway deployment...');
+
+// Determine if admin portal should be started
+const startAdmin = process.env.START_ADMIN_PORTAL === 'true' || process.env.ADMIN_ENABLED === 'true';
 
 // Start LibreChat main service
 console.log('🎯 Starting LibreChat main application...');
 const librechat = spawn('npm', ['run', 'backend'], {
   stdio: 'inherit',
   cwd: __dirname,
-  env: { ...process.env, NODE_ENV: 'production' }
+  env: { ...process.env }
 });
 
+let admin;
+
 // Start Admin Portal if enabled
-let admin = null;
-if (process.env.START_ADMIN_PORTAL === 'true') {
-  console.log('� Starting Admin Portal...');
+if (startAdmin) {
+  console.log('📊 Starting Admin Portal...');
   admin = spawn('npm', ['run', 'admin:start'], {
     stdio: 'inherit',
     cwd: __dirname,
-    env: { ...process.env, NODE_ENV: 'production' }
+    env: { ...process.env }
   });
 
   admin.on('error', (err) => {
     console.error('❌ Admin portal failed to start:', err);
   });
 
-  admin.on('exit', (code) => {
-    console.log(`� Admin portal exited with code ${code}`);
+  admin.on('close', (code) => {
+    console.log(`📊 Admin portal exited with code ${code}`);
   });
 }
 
-// Handle LibreChat process
 librechat.on('error', (err) => {
   console.error('❌ LibreChat failed to start:', err);
   process.exit(1);
 });
 
-librechat.on('exit', (code) => {
-  console.log(`🚀 LibreChat exited with code ${code}`);
+librechat.on('close', (code) => {
+  console.log(`🎯 LibreChat exited with code ${code}`);
+  if (admin) admin.kill('SIGTERM');
   process.exit(code);
 });
 
-// Graceful shutdown
+// Handle process termination
 process.on('SIGTERM', () => {
   console.log('🛑 Received SIGTERM, shutting down gracefully...');
   librechat.kill('SIGTERM');
