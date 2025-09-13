@@ -9,8 +9,11 @@ const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 
+// Import middleware
+const { verifyAdmin, protectSuperAdmin } = require('../middleware/adminProtection');
+
 // Middleware to verify admin token
-const verifyAdmin = async (req, res, next) => {
+const verifyAdminLegacy = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
@@ -20,7 +23,7 @@ const verifyAdmin = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
     const user = await User.findById(decoded.id);
     
-    if (!user || user.role !== 'ADMIN') {
+    if (!user || !['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
@@ -73,12 +76,17 @@ router.get('/users', verifyAdmin, async (req, res) => {
   }
 });
 
-// Update user role
-router.put('/users/:userId/role', verifyAdmin, async (req, res) => {
+// Update user role with super admin protection
+router.put('/users/:userId/role', verifyAdmin, protectSuperAdmin, async (req, res) => {
   try {
     const { role } = req.body;
     if (!['USER', 'ADMIN'].includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    // Prevent non-super-admins from creating admins
+    if (role === 'ADMIN' && !req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Only super admin can create admin users' });
     }
 
     const user = await User.findByIdAndUpdate(
@@ -97,17 +105,27 @@ router.put('/users/:userId/role', verifyAdmin, async (req, res) => {
   }
 });
 
-// Ban/unban user
-router.post('/users/:userId/ban', verifyAdmin, async (req, res) => {
+// Ban/unban user with super admin protection
+router.post('/users/:userId/ban', verifyAdmin, protectSuperAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Toggle ban status (assuming we have a banned field)
+    if (user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin cannot be banned' });
+    }
+
+    // Toggle ban status
     const banned = !user.banned;
-    await User.findByIdAndUpdate(req.params.userId, { banned });
+    const updateData = { banned };
+    if (banned) {
+      updateData.bannedAt = new Date();
+      updateData.bannedBy = req.user.id;
+    }
+
+    await User.findByIdAndUpdate(req.params.userId, updateData);
 
     res.json({ 
       message: `User ${banned ? 'banned' : 'unbanned'} successfully`,
@@ -118,12 +136,16 @@ router.post('/users/:userId/ban', verifyAdmin, async (req, res) => {
   }
 });
 
-// Delete user
-router.delete('/users/:userId', verifyAdmin, async (req, res) => {
+// Delete user with super admin protection
+router.delete('/users/:userId', verifyAdmin, protectSuperAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin cannot be deleted' });
     }
 
     // Delete user's conversations and messages
@@ -133,6 +155,9 @@ router.delete('/users/:userId', verifyAdmin, async (req, res) => {
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
+    if (error.message === 'Super admin cannot be deleted') {
+      return res.status(403).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -155,6 +180,7 @@ router.get('/statistics', verifyAdmin, async (req, res) => {
     const activeUsers = await User.countDocuments({ lastLogin: { $gte: sevenDaysAgo } });
     const verifiedUsers = await User.countDocuments({ emailVerified: true });
     const adminUsers = await User.countDocuments({ role: 'ADMIN' });
+    const superAdminUsers = await User.countDocuments({ role: 'SUPER_ADMIN' });
     const bannedUsers = await User.countDocuments({ banned: true });
     const twoFactorUsers = await User.countDocuments({ twoFactorEnabled: true });
     const recentLogins = await User.countDocuments({ lastLogin: { $gte: oneDayAgo } });
@@ -233,6 +259,7 @@ router.get('/statistics', verifyAdmin, async (req, res) => {
         registered: totalUsers,
         verified: verifiedUsers,
         admin: adminUsers,
+        superAdmin: superAdminUsers,
         banned: bannedUsers,
         twoFactor: twoFactorUsers,
         recentLogins

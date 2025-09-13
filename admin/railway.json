@@ -1,9 +1,11 @@
 {
   "version": 2,
   "build": {
-    "command": "npm install"
+    "builder": "dockerfile"
   },
-  "start": {
-    "command": "npm start"
+  "deploy": {
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "always"
   }
 }

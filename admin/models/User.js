@@ -37,7 +37,12 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
+    enum: ['USER', 'ADMIN', 'SUPER_ADMIN'],
     default: 'USER',
+  },
+  isSuperAdmin: {
+    type: Boolean,
+    default: false,
   },
   banned: {
     type: Boolean,
@@ -115,6 +120,28 @@ const userSchema = new mongoose.Schema({
     source: String,
   },
 }, { timestamps: true });
+
+// Prevent deletion of super admin
+userSchema.pre('findOneAndDelete', function() {
+  if (this.getQuery().isSuperAdmin === true) {
+    throw new Error('Super admin cannot be deleted');
+  }
+});
+
+userSchema.pre('deleteOne', function() {
+  if (this.getQuery().isSuperAdmin === true) {
+    throw new Error('Super admin cannot be deleted');
+  }
+});
+
+userSchema.pre('findOneAndUpdate', function() {
+  const update = this.getUpdate();
+  // Prevent changing super admin role or isSuperAdmin flag
+  if (this.getQuery().isSuperAdmin === true) {
+    if (update.role) delete update.role;
+    if (update.hasOwnProperty('isSuperAdmin')) delete update.isSuperAdmin;
+  }
+});
 
 // Virtual for account locked status
 userSchema.virtual('isLocked').get(function() {

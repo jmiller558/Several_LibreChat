@@ -4,6 +4,10 @@ const path = require('path');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
+// Import services
+const SuperAdminService = require('./services/superAdminService');
+const credentialSyncService = require('./services/credentialSyncService');
+
 const app = express();
 const PORT = process.env.PORT || process.env.ADMIN_PORT || 4000;
 
@@ -28,10 +32,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Import routes
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
+const healthRoutes = require('./routes/health');
 
 // Routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/health', healthRoutes);
+
+// Health check endpoint for Docker/Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    version: process.env.npm_package_version || '1.0.0'
+  });
+});
 
 // Serve the admin portal HTML
 app.get('/', (req, res) => {
@@ -43,6 +60,31 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 LibreChat Admin Portal running on http://localhost:${PORT}`);
+  
+  try {
+    // Ensure super admin exists on startup
+    await SuperAdminService.ensureSuperAdminExists();
+    
+    // Start periodic credential sync (checks every 5 minutes)
+    await credentialSyncService.startPeriodicCheck(5);
+    
+    console.log('✅ Super admin services initialized');
+  } catch (error) {
+    console.error('❌ Error initializing super admin services:', error);
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  credentialSyncService.stopPeriodicCheck();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  credentialSyncService.stopPeriodicCheck();
+  process.exit(0);
 });

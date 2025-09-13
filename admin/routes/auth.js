@@ -20,15 +20,26 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    if (user.role !== 'ADMIN') {
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
+      { 
+        id: user._id, 
+        email: user.email, 
+        role: user.role,
+        isSuperAdmin: user.isSuperAdmin || false
+      },
       process.env.JWT_SECRET || 'fallback_secret',
       { expiresIn: '24h' }
     );
+
+    // Update last login
+    await User.findByIdAndUpdate(user._id, { 
+      lastLogin: new Date(),
+      lastLoginIP: req.ip || req.connection.remoteAddress
+    });
 
     res.json({
       token,
@@ -36,7 +47,8 @@ router.post('/login', async (req, res) => {
         id: user._id,
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        isSuperAdmin: user.isSuperAdmin || false
       }
     });
   } catch (error) {
@@ -55,11 +67,19 @@ router.get('/verify', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
     const user = await User.findById(decoded.id).select('-password -refreshToken -totpSecret');
     
-    if (!user || user.role !== 'ADMIN') {
+    if (!user || !['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    res.json({ user });
+    res.json({ 
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isSuperAdmin: user.isSuperAdmin || false
+      }
+    });
   } catch (error) {
     res.status(401).json({ error: 'Invalid token' });
   }
