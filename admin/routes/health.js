@@ -8,14 +8,7 @@ const router = express.Router();
 router.get('/super-admin-status', async (req, res) => {
   try {
     const status = await SuperAdminService.getSuperAdminStatus();
-    const realTimeStatus = realTimeSyncService.getStatus();
-    
-    res.json({
-      ...status,
-      syncMode: realTimeStatus.syncMode,
-      syncInterval: realTimeStatus.syncInterval,
-      isRealTimeMonitoring: realTimeStatus.isMonitoring
-    });
+    res.json(status);
   } catch (error) {
     res.status(500).json({ error: 'Failed to check super admin status' });
   }
@@ -37,43 +30,78 @@ router.post('/sync-super-admin', verifySuperAdmin, async (req, res) => {
   }
 });
 
-// Instant sync endpoint - triggers immediate check
-router.post('/sync-super-admin-instant', verifySuperAdmin, async (req, res) => {
+// Real-time sync service status
+router.get('/sync-status', verifySuperAdmin, async (req, res) => {
   try {
-    console.log('🚨 Manual instant sync triggered...');
-    
-    // Force immediate check
-    const result = await realTimeSyncService.checkForInstantChanges();
-    
-    res.json({
-      message: 'Instant sync completed',
-      result: result || { message: 'No changes detected' },
-      timestamp: new Date().toISOString()
-    });
-    
+    const status = realTimeSyncService.getStatus();
+    res.json(status);
   } catch (error) {
-    console.error('❌ Manual instant sync error:', error);
-    res.status(500).json({ error: 'Instant sync failed' });
+    console.error('Error getting sync status:', error);
+    res.status(500).json({ error: 'Failed to get sync status' });
   }
 });
 
-// Force environment variable re-read and instant sync
-router.post('/force-env-sync', verifySuperAdmin, async (req, res) => {
+// Force immediate sync
+router.post('/force-sync', verifySuperAdmin, async (req, res) => {
   try {
-    console.log('🔄 Forcing environment variable sync...');
-    
-    // Force re-read environment variables and check
-    const result = await realTimeSyncService.forceInstantCheck();
-    
+    const result = await realTimeSyncService.forceSyncNow();
     res.json({
-      message: 'Environment variables re-read and super admin synced instantly',
-      result: result || { message: 'No changes needed' },
-      timestamp: new Date().toISOString()
+      message: 'Immediate sync completed',
+      status: result
     });
-    
   } catch (error) {
-    console.error('❌ Force env sync error:', error);
+    console.error('Force sync error:', error);
     res.status(500).json({ error: 'Force sync failed' });
+  }
+});
+
+// Clean up duplicate emails
+router.post('/cleanup-duplicates', verifySuperAdmin, async (req, res) => {
+  try {
+    const result = await realTimeSyncService.cleanupAllDuplicates();
+    
+    if (result.success) {
+      res.json({
+        message: 'Duplicate cleanup completed successfully',
+        result
+      });
+    } else {
+      res.status(500).json({
+        error: 'Duplicate cleanup failed',
+        details: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Cleanup duplicates error:', error);
+    res.status(500).json({ error: 'Cleanup failed' });
+  }
+});
+
+// Start real-time sync service
+router.post('/start-sync', verifySuperAdmin, async (req, res) => {
+  try {
+    realTimeSyncService.start();
+    res.json({
+      message: 'Real-time sync service started',
+      status: realTimeSyncService.getStatus()
+    });
+  } catch (error) {
+    console.error('Start sync error:', error);
+    res.status(500).json({ error: 'Failed to start sync service' });
+  }
+});
+
+// Stop real-time sync service
+router.post('/stop-sync', verifySuperAdmin, async (req, res) => {
+  try {
+    realTimeSyncService.stop();
+    res.json({
+      message: 'Real-time sync service stopped',
+      status: realTimeSyncService.getStatus()
+    });
+  } catch (error) {
+    console.error('Stop sync error:', error);
+    res.status(500).json({ error: 'Failed to stop sync service' });
   }
 });
 
@@ -87,42 +115,50 @@ router.get('/health', (req, res) => {
   });
 });
 
-// Debug super admin endpoint (temporary for troubleshooting)
-router.get('/debug-super-admin', async (req, res) => {
+// Get system summary
+router.get('/super-admin-summary', verifySuperAdmin, async (req, res) => {
   try {
-    const User = require('../models/User');
-    
-    // Get all super admins
-    const superAdmins = await User.find({ isSuperAdmin: true }).select('email role isSuperAdmin createdAt');
-    
-    // Get environment variables
-    const envVars = {
-      email: process.env.SUPER_ADMIN_EMAIL,
-      passwordSet: !!process.env.SUPER_ADMIN_PASSWORD,
-      mongoUri: process.env.MONGO_URI ? '[SET]' : process.env.DATABASE_URL ? '[SET]' : '[NOT SET]'
-    };
-    
-    // Check for mismatch
-    const hasValidSuperAdmin = superAdmins.length > 0 && 
-                              superAdmins[0].email === envVars.email;
-    
-    res.json({
-      databaseSuperAdmins: superAdmins,
-      environmentVariables: envVars,
-      status: {
-        superAdminExists: superAdmins.length > 0,
-        credentialsMatch: hasValidSuperAdmin,
-        needsFix: !hasValidSuperAdmin
-      },
-      recommendations: hasValidSuperAdmin ? 
-        ['✅ Super admin is properly configured'] : 
-        ['❌ Run npm run fix-super-admin to resolve issues']
-    });
+    const summary = await SuperAdminService.getSystemSummary();
+    res.json(summary);
   } catch (error) {
-    res.status(500).json({ 
-      error: error.message,
-      recommendation: 'Check database connection and try again'
+    console.error('Error getting system summary:', error);
+    res.status(500).json({ error: 'Failed to get system summary' });
+  }
+});
+
+// Promote existing user to super admin
+router.post('/promote-user-to-super-admin', verifySuperAdmin, async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const password = process.env.SUPER_ADMIN_PASSWORD;
+    if (!password) {
+      return res.status(400).json({ error: 'SUPER_ADMIN_PASSWORD environment variable not set' });
+    }
+
+    const result = await SuperAdminService.promoteExistingUserToSuperAdmin(email, password);
+
+    res.json({
+      message: `Successfully promoted ${email} to super admin`,
+      superAdmin: {
+        email: result.email,
+        id: result._id,
+        promotedAt: new Date()
+      }
     });
+
+  } catch (error) {
+    console.error('Error promoting user to super admin:', error);
+    
+    if (error.message.includes('not found')) {
+      res.status(404).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to promote user to super admin' });
+    }
   }
 });
 

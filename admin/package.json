@@ -9,7 +9,8 @@
     "create-admin": "node create-admin.js",
     "create-super-admin": "node create-super-admin.js",
     "test-super-admin": "node test-super-admin.js",
-    "fix-super-admin": "node fix-super-admin.js"
+    "cleanup-duplicates": "node scripts/cleanup-duplicate-email.js",
+    "cleanup-all-duplicates": "node scripts/cleanup-duplicate-email.js --all"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

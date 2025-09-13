@@ -110,9 +110,33 @@ class AdminPortal {
             });
         }
 
+        if (document.getElementById('cleanupDuplicatesBtn')) {
+            document.getElementById('cleanupDuplicatesBtn').addEventListener('click', () => {
+                this.cleanupDuplicateEmails();
+            });
+        }
+
+        if (document.getElementById('forceSyncNowBtn')) {
+            document.getElementById('forceSyncNowBtn').addEventListener('click', () => {
+                this.forceSyncNow();
+            });
+        }
+
         if (document.getElementById('refreshStatusBtn')) {
             document.getElementById('refreshStatusBtn').addEventListener('click', () => {
                 this.refreshSuperAdminStatus();
+            });
+        }
+
+        if (document.getElementById('getSystemSummaryBtn')) {
+            document.getElementById('getSystemSummaryBtn').addEventListener('click', () => {
+                this.getSystemSummary();
+            });
+        }
+
+        if (document.getElementById('promoteUserBtn')) {
+            document.getElementById('promoteUserBtn').addEventListener('click', () => {
+                this.promoteUserToSuperAdmin();
             });
         }
     }
@@ -951,6 +975,196 @@ class AdminPortal {
             console.error('Failed to force sync:', error);
             this.showMessage('Force sync failed: Network error', 'error');
             document.getElementById('syncStatus').textContent = 'Force Sync Failed';
+        }
+    }
+
+    async cleanupDuplicateEmails() {
+        if (!confirm('This will clean up all duplicate email addresses in the database. This action cannot be undone. Continue?')) {
+            return;
+        }
+        
+        try {
+            this.showMessage('Cleaning up duplicate emails...', 'info');
+            
+            const response = await fetch('/api/health/cleanup-duplicates', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.showMessage('Duplicate emails cleaned up successfully!', 'success');
+                
+                // Refresh status after cleanup
+                setTimeout(() => {
+                    this.refreshSuperAdminStatus();
+                    this.loadUsers(); // Refresh user list
+                }, 1000);
+                
+            } else {
+                const error = await response.json();
+                this.showMessage(`Cleanup failed: ${error.error || 'Unknown error'}`, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to cleanup duplicates:', error);
+            this.showMessage('Cleanup failed: Network error', 'error');
+        }
+    }
+
+    async forceSyncNow() {
+        try {
+            this.showMessage('Forcing immediate sync...', 'info');
+            
+            const response = await fetch('/api/health/force-sync', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.showMessage('Immediate sync completed successfully!', 'success');
+                
+                // Show sync status if available
+                if (data.status && data.status.retryQueueSize > 0) {
+                    this.showMessage(`Sync completed. ${data.status.retryQueueSize} items in retry queue.`, 'warning');
+                }
+                
+                // Refresh status after sync
+                setTimeout(() => {
+                    this.refreshSuperAdminStatus();
+                }, 1000);
+                
+            } else {
+                const error = await response.json();
+                this.showMessage(`Force sync failed: ${error.error || 'Unknown error'}`, 'error');
+            }
+        } catch (error) {
+            console.error('Failed to force sync:', error);
+            this.showMessage('Force sync failed: Network error', 'error');
+        }
+    }
+
+    async getSystemSummary() {
+        try {
+            this.showMessage('Getting system summary...', 'info');
+            
+            const response = await fetch('/api/health/super-admin-summary', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            const summary = await response.json();
+            
+            if (response.ok) {
+                this.displaySystemSummary(summary);
+                this.showMessage('✅ System summary loaded', 'success');
+            } else {
+                this.showMessage(summary.error || 'Failed to get summary', 'error');
+            }
+        } catch (error) {
+            this.showMessage('Error getting system summary', 'error');
+            console.error('Error:', error);
+        }
+    }
+
+    displaySystemSummary(summary) {
+        // Update UI with comprehensive system information
+        if (document.getElementById('currentSuperAdminEmail')) {
+            document.getElementById('currentSuperAdminEmail').textContent = 
+                summary.currentSuperAdmins[0]?.email || 'None';
+        }
+        if (document.getElementById('environmentTargetEmail')) {
+            document.getElementById('environmentTargetEmail').textContent = 
+                summary.environmentEmail || 'Not Set';
+        }
+        if (document.getElementById('syncStatus')) {
+            document.getElementById('syncStatus').textContent = 
+                summary.isInSync ? 'Synchronized' : 'Needs Sync';
+        }
+        if (document.getElementById('systemStatus')) {
+            document.getElementById('systemStatus').textContent = 
+                this.getStatusDescription(summary.systemStatus);
+        }
+        
+        // Show additional details
+        if (summary.currentSuperAdmins.length > 1) {
+            this.showMessage(`⚠️ Found ${summary.currentSuperAdmins.length} super admins. System will consolidate automatically.`, 'warning');
+        }
+
+        // Show what action will be taken
+        if (summary.systemStatus !== 'SYNCHRONIZED') {
+            const actionMessage = this.getActionMessage(summary.systemStatus, summary.environmentEmail);
+            this.showMessage(actionMessage, 'info');
+        }
+    }
+
+    getStatusDescription(status) {
+        const descriptions = {
+            'SYNCHRONIZED': '✅ Perfect',
+            'EMAIL_MISMATCH': '🔄 Will Promote User',
+            'NO_SUPER_ADMIN': '🆕 Will Create/Promote',
+            'MULTIPLE_SUPER_ADMINS': '🧹 Will Cleanup',
+            'ENV_VARS_NOT_SET': '❌ Env Vars Missing'
+        };
+        return descriptions[status] || status;
+    }
+
+    getActionMessage(status, envEmail) {
+        switch (status) {
+            case 'EMAIL_MISMATCH': 
+                return `Will promote existing user "${envEmail}" to super admin`;
+            case 'NO_SUPER_ADMIN': 
+                return `Will create or promote "${envEmail}" as super admin`;
+            case 'MULTIPLE_SUPER_ADMINS': 
+                return 'Will consolidate multiple super admins into one';
+            case 'ENV_VARS_NOT_SET':
+                return 'Set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD environment variables';
+            default: 
+                return 'System will be updated on next sync';
+        }
+    }
+
+    async promoteUserToSuperAdmin() {
+        const email = prompt('Enter email of user to promote to super admin:');
+        
+        if (!email) {
+            this.showMessage('Email is required', 'error');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to promote "${email}" to super admin? This will demote the current super admin.`)) {
+            return;
+        }
+
+        try {
+            this.showMessage('Promoting user to super admin...', 'info');
+            
+            const response = await fetch('/api/health/promote-user-to-super-admin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify({ email })
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showMessage(`✅ Successfully promoted ${email} to super admin!`, 'success');
+                await this.getSystemSummary();
+                await this.loadUsers(); // Refresh user list
+            } else {
+                this.showMessage(result.error || 'Failed to promote user', 'error');
+            }
+        } catch (error) {
+            this.showMessage('Error promoting user to super admin', 'error');
+            console.error('Error:', error);
         }
     }
 

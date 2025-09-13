@@ -6,6 +6,8 @@ require('dotenv').config();
 
 // Import services
 const SuperAdminService = require('./services/superAdminService');
+const credentialSyncService = require('./services/credentialSyncService');
+const realTimeSyncService = require('./services/realTimeSyncService');
 const realTimeSyncService = require('./services/realTimeSyncService');
 
 const app = express();
@@ -39,17 +41,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/health', healthRoutes);
 
-// Health check endpoint for Docker/Railway
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    version: process.env.npm_package_version || '1.0.0'
-  });
-});
-
 // Serve the admin portal HTML
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -64,35 +55,16 @@ app.listen(PORT, async () => {
   console.log(`🚀 LibreChat Admin Portal running on http://localhost:${PORT}`);
   
   try {
-    // DEBUG: Show current environment variables
-    console.log('\n🔍 Environment Variables Check:');
-    console.log('SUPER_ADMIN_EMAIL:', process.env.SUPER_ADMIN_EMAIL || '[NOT SET]');
-    console.log('SUPER_ADMIN_PASSWORD:', process.env.SUPER_ADMIN_PASSWORD ? '[SET]' : '[NOT SET]');
-    console.log('MONGO_URI:', process.env.MONGO_URI ? '[SET]' : process.env.DATABASE_URL ? '[SET]' : '[NOT SET]');
-    
-    // Check if super admin exists
-    const User = require('./models/User');
-    const existingSuperAdmin = await User.findOne({ isSuperAdmin: true });
-    
-    if (existingSuperAdmin) {
-      console.log('📋 Current Super Admin:', existingSuperAdmin.email);
-      console.log('🔄 Environment Email:', process.env.SUPER_ADMIN_EMAIL);
-      
-      if (existingSuperAdmin.email !== process.env.SUPER_ADMIN_EMAIL) {
-        console.log('⚠️  MISMATCH DETECTED! Run "npm run fix-super-admin" to fix this.');
-      }
-    }
-    
     // Ensure super admin exists on startup
     await SuperAdminService.ensureSuperAdminExists();
     
-    // Start REAL-TIME credential synchronization (10 seconds interval)
-    console.log('⚡ Starting INSTANT credential synchronization...');
-    realTimeSyncService.startRealTimeMonitoring();
+    // Start periodic credential sync (checks every 5 minutes) - legacy support
+    await credentialSyncService.startPeriodicCheck(5);
     
-    console.log('✅ Super admin services initialized with INSTANT sync!');
-    console.log(`🌐 Debug endpoint: http://localhost:${PORT}/api/health/debug-super-admin`);
+    // Start real-time sync service (checks every 10 seconds)
+    realTimeSyncService.start();
     
+    console.log('✅ Super admin services initialized with real-time sync');
   } catch (error) {
     console.error('❌ Error initializing super admin services:', error);
   }
@@ -101,12 +73,14 @@ app.listen(PORT, async () => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
-  realTimeSyncService.stopRealTimeMonitoring();
+  credentialSyncService.stopPeriodicCheck();
+  realTimeSyncService.stop();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully...');
-  realTimeSyncService.stopRealTimeMonitoring();
+  credentialSyncService.stopPeriodicCheck();
+  realTimeSyncService.stop();
   process.exit(0);
 });
