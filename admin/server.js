@@ -6,7 +6,7 @@ require('dotenv').config();
 
 // Import services
 const SuperAdminService = require('./services/superAdminService');
-const credentialSyncService = require('./services/credentialSyncService');
+const realTimeSyncService = require('./services/realTimeSyncService');
 
 const app = express();
 const PORT = process.env.PORT || process.env.ADMIN_PORT || 4000;
@@ -67,10 +67,11 @@ app.listen(PORT, async () => {
     // Ensure super admin exists on startup
     await SuperAdminService.ensureSuperAdminExists();
     
-    // Start periodic credential sync (checks every 5 minutes)
-    await credentialSyncService.startPeriodicCheck(5);
+    // Start REAL-TIME credential synchronization (10 seconds interval)
+    console.log('⚡ Starting INSTANT credential synchronization...');
+    realTimeSyncService.startRealTimeMonitoring();
     
-    console.log('✅ Super admin services initialized');
+    console.log('✅ Super admin services initialized with INSTANT sync!');
   } catch (error) {
     console.error('❌ Error initializing super admin services:', error);
   }
@@ -79,12 +80,12 @@ app.listen(PORT, async () => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
-  credentialSyncService.stopPeriodicCheck();
+  realTimeSyncService.stopRealTimeMonitoring();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully...');
-  credentialSyncService.stopPeriodicCheck();
+  realTimeSyncService.stopRealTimeMonitoring();
   process.exit(0);
 });

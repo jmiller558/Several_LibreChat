@@ -15,6 +15,7 @@ class AdminPortal {
 
         this.setupEventListeners();
         this.setupBulkActions();
+        this.setupSuperAdminEventListeners();
     }
 
     setupEventListeners() {
@@ -224,6 +225,7 @@ class AdminPortal {
                 break;
             case 'security':
                 this.loadSecurityDashboard();
+                this.loadCurrentSuperAdmin(); // Load super admin status when security section is shown
                 break;
             case 'statistics':
                 this.loadStatistics();
@@ -798,6 +800,150 @@ class AdminPortal {
         } catch (error) {
             console.error('Failed to load database info:', error);
         }
+    }
+
+    // Super Admin Management Functions
+    async loadCurrentSuperAdmin() {
+        try {
+            const response = await fetch('/api/health/super-admin-status', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('currentSuperAdminEmail').textContent = data.email || 'Not found';
+                
+                const statusElement = document.getElementById('currentSuperAdminStatus');
+                statusElement.textContent = data.emailMatches ? 
+                    `Synced (${data.syncMode})` : 
+                    'Out of sync';
+                statusElement.className = data.emailMatches ? 'font-semibold text-green-600' : 'font-semibold text-red-600';
+                
+                // Show sync mode info
+                const syncInfo = document.getElementById('syncModeInfo');
+                if (syncInfo) {
+                    syncInfo.textContent = `Sync Mode: ${data.syncMode} - ${data.syncInterval}`;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load super admin status:', error);
+        }
+    }
+
+    async instantSync() {
+        try {
+            this.showMessage('Triggering instant sync...', 'info');
+            
+            const response = await fetch('/api/health/sync-super-admin-instant', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showMessage('✅ Instant sync completed!', 'success');
+                await this.loadCurrentSuperAdmin();
+            } else {
+                this.showMessage(result.error || 'Instant sync failed', 'error');
+            }
+        } catch (error) {
+            this.showMessage('Error during instant sync', 'error');
+            console.error('Error:', error);
+        }
+    }
+
+    async forceEnvSync() {
+        try {
+            this.showMessage('Forcing environment variable sync...', 'info');
+            
+            const response = await fetch('/api/health/force-env-sync', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showMessage('✅ Environment variables synced instantly!', 'success');
+                await this.loadCurrentSuperAdmin();
+            } else {
+                this.showMessage(result.error || 'Force sync failed', 'error');
+            }
+        } catch (error) {
+            this.showMessage('Error during force sync', 'error');
+            console.error('Error:', error);
+        }
+    }
+
+    showMessage(message, type = 'info') {
+        // Create or update message display
+        let messageDiv = document.getElementById('statusMessage');
+        if (!messageDiv) {
+            messageDiv = document.createElement('div');
+            messageDiv.id = 'statusMessage';
+            messageDiv.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm';
+            document.body.appendChild(messageDiv);
+        }
+
+        // Set message content and style
+        messageDiv.textContent = message;
+        
+        // Remove existing color classes
+        messageDiv.classList.remove('bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-yellow-500');
+        
+        // Add appropriate color class
+        switch (type) {
+            case 'success':
+                messageDiv.classList.add('bg-green-500', 'text-white');
+                break;
+            case 'error':
+                messageDiv.classList.add('bg-red-500', 'text-white');
+                break;
+            case 'info':
+                messageDiv.classList.add('bg-blue-500', 'text-white');
+                break;
+            default:
+                messageDiv.classList.add('bg-yellow-500', 'text-black');
+        }
+
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            messageDiv.remove();
+        }, 3000);
+    }
+
+    setupSuperAdminEventListeners() {
+        // Instant sync button
+        const instantSyncBtn = document.getElementById('instantSyncBtn');
+        if (instantSyncBtn) {
+            instantSyncBtn.addEventListener('click', () => {
+                this.instantSync();
+            });
+        }
+
+        // Force env sync button
+        const forceEnvSyncBtn = document.getElementById('forceEnvSyncBtn');
+        if (forceEnvSyncBtn) {
+            forceEnvSyncBtn.addEventListener('click', () => {
+                this.forceEnvSync();
+            });
+        }
+
+        // Auto-refresh super admin status every 30 seconds
+        setInterval(async () => {
+            if (document.getElementById('currentSuperAdminEmail') && 
+                document.getElementById('security-section') && 
+                !document.getElementById('security-section').classList.contains('hidden')) {
+                await this.loadCurrentSuperAdmin();
+            }
+        }, 30000);
     }
 }
 

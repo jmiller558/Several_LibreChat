@@ -162,6 +162,71 @@ router.delete('/users/:userId', verifyAdmin, protectSuperAdmin, async (req, res)
   }
 });
 
+// Change super admin endpoint (only accessible by current super admin)
+router.post('/change-super-admin', verifyAdmin, async (req, res) => {
+  try {
+    // Verify the requester is the current super admin
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ 
+        error: 'Only the current super admin can change super admin credentials' 
+      });
+    }
+
+    const { newEmail, newPassword, currentPassword } = req.body;
+
+    if (!newEmail || !newPassword || !currentPassword) {
+      return res.status(400).json({ 
+        error: 'New email, new password, and current password are required' 
+      });
+    }
+
+    // Verify current password
+    const currentSuperAdmin = await User.findById(req.user.id);
+    const isValidPassword = await bcrypt.compare(currentPassword, currentSuperAdmin.password);
+    
+    if (!isValidPassword) {
+      return res.status(400).json({ 
+        error: 'Current password is incorrect' 
+      });
+    }
+
+    // Check if new email is already taken by another user
+    const existingUser = await User.findOne({ 
+      email: newEmail, 
+      _id: { $ne: currentSuperAdmin._id } 
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({ 
+        error: 'Email is already in use by another user' 
+      });
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update super admin credentials
+    await User.findByIdAndUpdate(currentSuperAdmin._id, {
+      email: newEmail,
+      password: hashedNewPassword,
+      passwordChangedAt: new Date()
+    });
+
+    // Log the change
+    console.log(`Super admin credentials changed from ${currentSuperAdmin.email} to ${newEmail} at ${new Date()}`);
+
+    res.json({
+      message: 'Super admin credentials updated successfully',
+      newEmail: newEmail,
+      warning: 'Please update your environment variables (SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD) to match these new credentials'
+    });
+
+  } catch (error) {
+    console.error('Error changing super admin:', error);
+    res.status(500).json({ error: 'Failed to change super admin credentials' });
+  }
+});
+
 // Get comprehensive statistics
 router.get('/statistics', verifyAdmin, async (req, res) => {
   try {
