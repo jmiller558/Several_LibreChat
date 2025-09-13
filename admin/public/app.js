@@ -15,7 +15,6 @@ class AdminPortal {
 
         this.setupEventListeners();
         this.setupBulkActions();
-        this.setupSuperAdminEventListeners();
     }
 
     setupEventListeners() {
@@ -102,7 +101,7 @@ class AdminPortal {
     setupBulkActions() {
         // Select all checkbox
         document.getElementById('selectAll').addEventListener('change', (e) => {
-            const checkboxes = document.querySelectorAll('.user-checkbox');
+            const checkboxes = document.querySelectorAll('.user-checkbox:not(:disabled)');
             checkboxes.forEach(checkbox => {
                 checkbox.checked = e.target.checked;
                 if (e.target.checked) {
@@ -116,7 +115,7 @@ class AdminPortal {
 
         // Individual checkboxes
         document.addEventListener('change', (e) => {
-            if (e.target.classList.contains('user-checkbox')) {
+            if (e.target.classList.contains('user-checkbox') && !e.target.disabled) {
                 if (e.target.checked) {
                     this.selectedUsers.add(e.target.value);
                 } else {
@@ -225,7 +224,6 @@ class AdminPortal {
                 break;
             case 'security':
                 this.loadSecurityDashboard();
-                this.loadCurrentSuperAdmin(); // Load super admin status when security section is shown
                 break;
             case 'statistics':
                 this.loadStatistics();
@@ -298,6 +296,11 @@ class AdminPortal {
 
         users.forEach(user => {
             const row = document.createElement('tr');
+            // Add special styling for super admin rows
+            if (user.role === 'SUPER_ADMIN') {
+                row.className = 'super-admin-row';
+            }
+            
             const lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never';
             const status = user.banned ? 'Banned' : (!user.emailVerified ? 'Unverified' : 'Active');
             const statusClass = user.banned ? 'bg-red-100 text-red-800' : 
@@ -305,7 +308,8 @@ class AdminPortal {
 
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <input type="checkbox" class="user-checkbox rounded" value="${user._id}">
+                    <input type="checkbox" class="user-checkbox rounded" value="${user._id}" 
+                           ${user.role === 'SUPER_ADMIN' ? 'disabled title="Super Admin cannot be selected for bulk operations"' : ''}>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
@@ -318,9 +322,10 @@ class AdminPortal {
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        user.role === 'SUPER_ADMIN' ? 'super-admin-badge' : 
                         user.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
                     }">
-                        ${user.role}
+                        ${user.role === 'SUPER_ADMIN' ? '🔒 SUPER ADMIN' : user.role}
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -335,18 +340,24 @@ class AdminPortal {
                     ${new Date(user.createdAt).toLocaleDateString()}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button onclick="adminPortal.toggleUserRole('${user._id}', '${user.role}')" 
-                            class="text-blue-600 hover:text-blue-900 mr-3">
-                        ${user.role === 'ADMIN' ? 'Remove Admin' : 'Make Admin'}
-                    </button>
-                    <button onclick="adminPortal.toggleUserBan('${user._id}', ${user.banned})" 
-                            class="text-yellow-600 hover:text-yellow-900 mr-3">
-                        ${user.banned ? 'Unban' : 'Ban'}
-                    </button>
-                    <button onclick="adminPortal.deleteUser('${user._id}')" 
-                            class="text-red-600 hover:text-red-900">
-                        Delete
-                    </button>
+                    ${user.role !== 'SUPER_ADMIN' ? `
+                        <button onclick="adminPortal.toggleUserRole('${user._id}', '${user.role}')" 
+                                class="text-blue-600 hover:text-blue-900 mr-3">
+                            ${user.role === 'ADMIN' ? 'Remove Admin' : 'Make Admin'}
+                        </button>
+                        <button onclick="adminPortal.toggleUserBan('${user._id}', ${user.banned})" 
+                                class="text-yellow-600 hover:text-yellow-900 mr-3">
+                            ${user.banned ? 'Unban' : 'Ban'}
+                        </button>
+                        <button onclick="adminPortal.deleteUser('${user._id}')" 
+                                class="text-red-600 hover:text-red-900">
+                            Delete
+                        </button>
+                    ` : `
+                        <span class="protected-text text-xs">
+                            <i class="fas fa-shield-alt mr-1"></i>Protected
+                        </span>
+                    `}
                 </td>
             `;
             tbody.appendChild(row);
@@ -800,150 +811,6 @@ class AdminPortal {
         } catch (error) {
             console.error('Failed to load database info:', error);
         }
-    }
-
-    // Super Admin Management Functions
-    async loadCurrentSuperAdmin() {
-        try {
-            const response = await fetch('/api/health/super-admin-status', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                document.getElementById('currentSuperAdminEmail').textContent = data.email || 'Not found';
-                
-                const statusElement = document.getElementById('currentSuperAdminStatus');
-                statusElement.textContent = data.emailMatches ? 
-                    `Synced (${data.syncMode})` : 
-                    'Out of sync';
-                statusElement.className = data.emailMatches ? 'font-semibold text-green-600' : 'font-semibold text-red-600';
-                
-                // Show sync mode info
-                const syncInfo = document.getElementById('syncModeInfo');
-                if (syncInfo) {
-                    syncInfo.textContent = `Sync Mode: ${data.syncMode} - ${data.syncInterval}`;
-                }
-            }
-        } catch (error) {
-            console.error('Failed to load super admin status:', error);
-        }
-    }
-
-    async instantSync() {
-        try {
-            this.showMessage('Triggering instant sync...', 'info');
-            
-            const response = await fetch('/api/health/sync-super-admin-instant', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-
-            const result = await response.json();
-            
-            if (response.ok) {
-                this.showMessage('✅ Instant sync completed!', 'success');
-                await this.loadCurrentSuperAdmin();
-            } else {
-                this.showMessage(result.error || 'Instant sync failed', 'error');
-            }
-        } catch (error) {
-            this.showMessage('Error during instant sync', 'error');
-            console.error('Error:', error);
-        }
-    }
-
-    async forceEnvSync() {
-        try {
-            this.showMessage('Forcing environment variable sync...', 'info');
-            
-            const response = await fetch('/api/health/force-env-sync', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-
-            const result = await response.json();
-            
-            if (response.ok) {
-                this.showMessage('✅ Environment variables synced instantly!', 'success');
-                await this.loadCurrentSuperAdmin();
-            } else {
-                this.showMessage(result.error || 'Force sync failed', 'error');
-            }
-        } catch (error) {
-            this.showMessage('Error during force sync', 'error');
-            console.error('Error:', error);
-        }
-    }
-
-    showMessage(message, type = 'info') {
-        // Create or update message display
-        let messageDiv = document.getElementById('statusMessage');
-        if (!messageDiv) {
-            messageDiv = document.createElement('div');
-            messageDiv.id = 'statusMessage';
-            messageDiv.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm';
-            document.body.appendChild(messageDiv);
-        }
-
-        // Set message content and style
-        messageDiv.textContent = message;
-        
-        // Remove existing color classes
-        messageDiv.classList.remove('bg-green-500', 'bg-red-500', 'bg-blue-500', 'bg-yellow-500');
-        
-        // Add appropriate color class
-        switch (type) {
-            case 'success':
-                messageDiv.classList.add('bg-green-500', 'text-white');
-                break;
-            case 'error':
-                messageDiv.classList.add('bg-red-500', 'text-white');
-                break;
-            case 'info':
-                messageDiv.classList.add('bg-blue-500', 'text-white');
-                break;
-            default:
-                messageDiv.classList.add('bg-yellow-500', 'text-black');
-        }
-
-        // Auto-hide after 3 seconds
-        setTimeout(() => {
-            messageDiv.remove();
-        }, 3000);
-    }
-
-    setupSuperAdminEventListeners() {
-        // Instant sync button
-        const instantSyncBtn = document.getElementById('instantSyncBtn');
-        if (instantSyncBtn) {
-            instantSyncBtn.addEventListener('click', () => {
-                this.instantSync();
-            });
-        }
-
-        // Force env sync button
-        const forceEnvSyncBtn = document.getElementById('forceEnvSyncBtn');
-        if (forceEnvSyncBtn) {
-            forceEnvSyncBtn.addEventListener('click', () => {
-                this.forceEnvSync();
-            });
-        }
-
-        // Auto-refresh super admin status every 30 seconds
-        setInterval(async () => {
-            if (document.getElementById('currentSuperAdminEmail') && 
-                document.getElementById('security-section') && 
-                !document.getElementById('security-section').classList.contains('hidden')) {
-                await this.loadCurrentSuperAdmin();
-            }
-        }, 30000);
     }
 }
 
