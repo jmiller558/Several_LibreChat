@@ -16,12 +16,13 @@
         }
         
         body {
-            background: #F3F4F6 !important;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
             color: #1F2937 !important;
+            min-height: 100vh;
         }
         
         .bg-gray-100 {
-            background: #F3F4F6 !important;
+            background: transparent !important;
         }
         
         .bg-white {
@@ -49,6 +50,16 @@
             border-color: var(--primary-blue) !important;
         }
         
+        /* Enhanced styling */
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+            overflow: hidden;
+        }
+        
         /* Super Admin and disabled checkbox styling */
         .user-checkbox:disabled {
             opacity: 0.4;
@@ -73,19 +84,25 @@
         
         .sidebar-item:hover {
             background-color: rgba(59, 130, 246, 0.1) !important;
+            transform: translateX(4px);
+            transition: all 0.2s ease;
         }
         
         .sidebar-item.active {
             background-color: rgba(59, 130, 246, 0.2) !important;
-            border-right: 3px solid var(--primary-blue) !important;
+            border-right: 4px solid var(--primary-blue) !important;
+            transform: translateX(4px);
         }
         
         nav.bg-white {
-            background: #FFFFFF !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
         
         nav h1 {
             color: #1F2937 !important;
+            font-weight: 700;
         }
         
         #userInfo {
@@ -93,7 +110,8 @@
         }
         
         aside.bg-white {
-            background: #FFFFFF !important;
+            background: rgba(255, 255, 255, 0.98) !important;
+            backdrop-filter: blur(10px);
         }
         
         input, select {
@@ -137,54 +155,62 @@
             <div class="max-w-7xl mx-auto px-4">
                 <div class="flex justify-between h-16">
                     <div class="flex items-center">
-                        <h1 class="text-xl font-bold text-gray-800">LibreChat Admin Portal</h1>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-shield-alt text-white text-sm"></i>
+                            </div>
+                            <h1 class="text-xl font-bold text-gray-800">LibreChat Admin Portal</h1>
+                        </div>
                     </div>
                     <div class="flex items-center space-x-4">
-                        <span id="userInfo" class="text-gray-600"></span>
-                        <button id="logoutBtn" class="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded">
-                            Logout
+                        <span id="userInfo" class="text-gray-600 font-medium"></span>
+                        <button id="logoutBtn" class="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Logout
                         </button>
                     </div>
                 </div>
             </div>
         </nav>
 
-        <div class="flex">
+        <div class="main-container">
+            <div class="flex min-h-screen">
             <!-- Sidebar -->
-            <aside class="w-64 min-h-screen bg-white shadow-lg">
-                <nav class="mt-8">
-                    <a href="#" class="sidebar-item active block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="dashboard">
-                        <i class="fas fa-tachometer-alt mr-3"></i>
-                        Dashboard
-                    </a>
-                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="users">
-                        <i class="fas fa-users mr-3"></i>
-                        User Management
-                    </a>
-                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="security">
-                        <i class="fas fa-shield-alt mr-3"></i>
-                        Security
-                    </a>
-                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="statistics">
-                        <i class="fas fa-chart-bar mr-3"></i>
-                        Statistics
-                    </a>
-                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="database">
-                        <i class="fas fa-database mr-3"></i>
-                        Database
-                    </a>
-                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="super-admin">
-                        <i class="fas fa-crown mr-3 text-red-500"></i>
-                        Super Admin
-                    </a>
-                </nav>
+            <aside class="w-64 bg-white shadow-lg border-r border-gray-200">
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-6">Navigation</h3>
+                    <nav class="space-y-2">
+                        <a href="#" class="sidebar-item active flex items-center py-3 px-4 text-gray-700 hover:bg-blue-50 rounded-lg transition-all" data-section="dashboard">
+                            <i class="fas fa-tachometer-alt mr-3 w-5"></i>
+                            <span class="font-medium">Dashboard</span>
+                        </a>
+                        <a href="#" class="sidebar-item flex items-center py-3 px-4 text-gray-700 hover:bg-blue-50 rounded-lg transition-all" data-section="users">
+                            <i class="fas fa-users mr-3 w-5"></i>
+                            <span class="font-medium">User Management</span>
+                        </a>
+                        <a href="#" class="sidebar-item flex items-center py-3 px-4 text-gray-700 hover:bg-blue-50 rounded-lg transition-all" data-section="security">
+                            <i class="fas fa-shield-alt mr-3 w-5 text-red-500"></i>
+                            <span class="font-medium">Security & Admin</span>
+                        </a>
+                        <a href="#" class="sidebar-item flex items-center py-3 px-4 text-gray-700 hover:bg-blue-50 rounded-lg transition-all" data-section="statistics">
+                            <i class="fas fa-chart-bar mr-3 w-5 text-green-500"></i>
+                            <span class="font-medium">Statistics</span>
+                        </a>
+                        <a href="#" class="sidebar-item flex items-center py-3 px-4 text-gray-700 hover:bg-blue-50 rounded-lg transition-all" data-section="database">
+                            <i class="fas fa-database mr-3 w-5 text-purple-500"></i>
+                            <span class="font-medium">Database</span>
+                        </a>
+                    </nav>
+                </div>
             </aside>
 
             <!-- Main Content -->
-            <main class="flex-1 p-8">
+            <main class="flex-1 p-8 bg-gray-50 overflow-y-auto">
                 <!-- Dashboard Section -->
                 <div id="dashboard-section" class="section">
-                    <h2 class="text-2xl font-bold mb-6">Dashboard Overview</h2>
+                    <div class="mb-8">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h2>
+                        <p class="text-gray-600">Welcome to the LibreChat Admin Portal</p>
+                    </div>
                     
                     <!-- Stats Cards -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -342,70 +368,196 @@
 
                 <!-- Security Section -->
                 <div id="security-section" class="section hidden">
-                    <h2 class="text-2xl font-bold mb-6">Security Dashboard</h2>
+                    <div class="mb-8">
+                        <h2 class="text-3xl font-bold text-gray-900 mb-2">
+                            <i class="fas fa-shield-alt mr-3 text-blue-600"></i>Security & Admin Management
+                        </h2>
+                        <p class="text-gray-600">Manage system security, user permissions, and administrative access</p>
+                    </div>
                     
-                    <!-- Security Stats -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="flex items-center">
-                                <div class="p-3 rounded-full bg-red-100 text-red-600">
-                                    <i class="fas fa-ban text-2xl"></i>
+                    <!-- Security Overview Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-blue-700 mb-1">Admin Users</p>
+                                    <p id="adminCount" class="text-3xl font-bold text-blue-900">-</p>
                                 </div>
-                                <div class="ml-4">
-                                    <p class="text-sm font-medium text-gray-600">Banned Users</p>
-                                    <p id="bannedUsers" class="text-2xl font-bold text-gray-900">-</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="flex items-center">
-                                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
-                                    <i class="fas fa-exclamation-triangle text-2xl"></i>
-                                </div>
-                                <div class="ml-4">
-                                    <p class="text-sm font-medium text-gray-600">Unverified</p>
-                                    <p id="unverifiedUsers" class="text-2xl font-bold text-gray-900">-</p>
+                                <div class="p-3 bg-blue-200 rounded-lg">
+                                    <i class="fas fa-user-shield text-xl text-blue-600"></i>
                                 </div>
                             </div>
                         </div>
                         
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="flex items-center">
-                                <div class="p-3 rounded-full bg-green-100 text-green-600">
-                                    <i class="fas fa-shield-alt text-2xl"></i>
+                        <div class="bg-gradient-to-br from-red-50 to-red-100 p-6 rounded-xl border border-red-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-red-700 mb-1">Super Admin</p>
+                                    <p id="superAdminStatus" class="text-lg font-bold text-red-900">Active</p>
                                 </div>
-                                <div class="ml-4">
-                                    <p class="text-sm font-medium text-gray-600">2FA Enabled</p>
-                                    <p id="twoFactorUsers" class="text-2xl font-bold text-gray-900">-</p>
+                                <div class="p-3 bg-red-200 rounded-lg">
+                                    <i class="fas fa-crown text-xl text-red-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-6 rounded-xl border border-yellow-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-yellow-700 mb-1">Banned Users</p>
+                                    <p id="bannedUsers" class="text-3xl font-bold text-yellow-900">-</p>
+                                </div>
+                                <div class="p-3 bg-yellow-200 rounded-lg">
+                                    <i class="fas fa-ban text-xl text-yellow-600"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-xl border border-orange-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-orange-700 mb-1">Unverified</p>
+                                    <p id="unverifiedUsers" class="text-3xl font-bold text-orange-900">-</p>
+                                </div>
+                                <div class="p-3 bg-orange-200 rounded-lg">
+                                    <i class="fas fa-exclamation-triangle text-xl text-orange-600"></i>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Security Audit -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <h3 class="text-lg font-semibold mb-4">Recent Security Events</h3>
-                            <div id="securityEvents" class="space-y-3">
-                                <p class="text-gray-500">Loading security events...</p>
+                    <!-- Admin Management Section -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                        <!-- Super Admin Controls -->
+                        <div class="lg:col-span-2">
+                            <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                                <div class="bg-gradient-to-r from-red-600 to-red-700 p-6 text-white">
+                                    <h3 class="text-xl font-bold flex items-center">
+                                        <i class="fas fa-crown mr-3"></i>Super Admin Management
+                                    </h3>
+                                    <p class="text-red-100 mt-2">Universal admin promotion system with real-time synchronization</p>
+                                </div>
+                                
+                                <div class="p-6">
+                                    <!-- Status Grid -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                        <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                            <h4 class="text-sm font-semibold text-blue-700 mb-2">Current Super Admin</h4>
+                                            <p id="currentSuperAdminEmail" class="font-medium text-gray-900">Loading...</p>
+                                            <p id="currentSuperAdminId" class="text-xs text-gray-500 mt-1">Loading...</p>
+                                        </div>
+                                        
+                                        <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                                            <h4 class="text-sm font-semibold text-green-700 mb-2">Environment Target</h4>
+                                            <p id="environmentTargetEmail" class="font-medium text-gray-900">Loading...</p>
+                                            <p id="environmentStatus" class="text-xs text-gray-500 mt-1">Loading...</p>
+                                        </div>
+                                        
+                                        <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                                            <h4 class="text-sm font-semibold text-yellow-700 mb-2">Sync Status</h4>
+                                            <p id="syncStatusDetail" class="font-medium text-gray-900">Loading...</p>
+                                            <p id="lastSync" class="text-xs text-gray-500 mt-1">Loading...</p>
+                                        </div>
+                                        
+                                        <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                                            <h4 class="text-sm font-semibold text-purple-700 mb-2">System Status</h4>
+                                            <p id="systemStatus" class="font-medium text-gray-900">Loading...</p>
+                                            <p id="actionTaken" class="text-xs text-gray-500 mt-1">Loading...</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Action Buttons -->
+                                    <div class="flex flex-wrap gap-3">
+                                        <button id="syncSuperAdminBtn" 
+                                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors">
+                                            <i class="fas fa-sync mr-2"></i>Sync Now
+                                        </button>
+                                        
+                                        <button id="getSystemSummaryBtn" 
+                                                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors">
+                                            <i class="fas fa-info-circle mr-2"></i>System Summary
+                                        </button>
+                                        
+                                        <button id="promoteUserBtn" 
+                                                class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors">
+                                            <i class="fas fa-user-plus mr-2"></i>Promote User
+                                        </button>
+                                        
+                                        <button id="refreshStatusBtn" 
+                                                class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors">
+                                            <i class="fas fa-refresh mr-2"></i>Refresh Status
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <h3 class="text-lg font-semibold mb-4">System Health</h3>
-                            <div class="space-y-4">
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Email Verification Rate:</span>
-                                    <span id="verificationRate" class="font-semibold">-%</span>
+                        <!-- System Information -->
+                        <div>
+                            <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden h-fit">
+                                <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 p-4 text-white">
+                                    <h3 class="font-bold flex items-center">
+                                        <i class="fas fa-info-circle mr-2"></i>System Information
+                                    </h3>
                                 </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Admin Users:</span>
-                                    <span id="adminCount" class="font-semibold">-</span>
+                                
+                                <div class="p-4">
+                                    <div class="space-y-4 text-sm">
+                                        <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+                                            <h4 class="font-semibold text-indigo-800 mb-2">Universal System</h4>
+                                            <ul class="text-indigo-700 space-y-1 text-xs">
+                                                <li>• Promotes existing users (no duplicates)</li>
+                                                <li>• Preserves all user data</li>
+                                                <li>• Safe admin transitions</li>
+                                                <li>• Auto-sync every 10 seconds</li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <div class="bg-green-50 p-3 rounded-lg border border-green-200">
+                                            <h4 class="font-semibold text-green-800 mb-2">Protection</h4>
+                                            <p class="text-green-700 text-xs">Only super admins can manage other admin users. Regular admins are protected from each other.</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex justify-between">
-                                    <span class="text-gray-600">Active Sessions:</span>
-                                    <span id="activeSessions" class="font-semibold">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Security Monitoring -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                            <div class="bg-gradient-to-r from-gray-600 to-gray-700 p-4 text-white">
+                                <h3 class="font-bold flex items-center">
+                                    <i class="fas fa-list-alt mr-2"></i>Security Events
+                                </h3>
+                            </div>
+                            <div class="p-4">
+                                <div id="securityEvents" class="space-y-3 min-h-32">
+                                    <p class="text-gray-500 text-center py-8">Loading security events...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                            <div class="bg-gradient-to-r from-emerald-600 to-emerald-700 p-4 text-white">
+                                <h3 class="font-bold flex items-center">
+                                    <i class="fas fa-heart text-red-300 mr-2"></i>System Health
+                                </h3>
+                            </div>
+                            <div class="p-4">
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                                        <span class="text-gray-600 font-medium">Email Verification Rate</span>
+                                        <span id="verificationRate" class="font-bold text-gray-900">-%</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                                        <span class="text-gray-600 font-medium">Active Sessions</span>
+                                        <span id="activeSessions" class="font-bold text-gray-900">-</span>
+                                    </div>
+                                    <div class="flex justify-between items-center py-2">
+                                        <span class="text-gray-600 font-medium">Last Sync</span>
+                                        <span id="lastSyncTime" class="font-bold text-gray-900">Never</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -573,211 +725,6 @@
                     <div class="bg-white p-6 rounded-lg shadow">
                         <div id="databaseInfo">
                             <p>Loading database information...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Super Admin Section -->
-                <div id="super-admin-section" class="section hidden">
-                    <h2 class="text-2xl font-bold mb-6 text-red-600">
-                        <i class="fas fa-crown mr-2"></i>Super Admin Management
-                    </h2>
-                    
-                    <!-- Status Cards -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="flex items-center">
-                                <div class="p-3 rounded-full bg-red-100 text-red-500">
-                                    <i class="fas fa-shield-alt text-xl"></i>
-                                </div>
-                                <div class="ml-4">
-                                    <h3 class="text-lg font-semibold text-gray-900">Super Admin Status</h3>
-                                    <p id="superAdminStatus" class="text-sm text-gray-600">Checking...</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="flex items-center">
-                                <div class="p-3 rounded-full bg-blue-100 text-blue-500">
-                                    <i class="fas fa-sync text-xl"></i>
-                                </div>
-                                <div class="ml-4">
-                                    <h3 class="text-lg font-semibold text-gray-900">Sync Status</h3>
-                                    <p id="syncStatus" class="text-sm text-gray-600">Ready</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="flex items-center">
-                                <div class="p-3 rounded-full bg-green-100 text-green-500">
-                                    <i class="fas fa-clock text-xl"></i>
-                                </div>
-                                <div class="ml-4">
-                                    <h3 class="text-lg font-semibold text-gray-900">Last Sync</h3>
-                                    <p id="lastSyncTime" class="text-sm text-gray-600">Never</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Instant Sync Controls -->
-                    <div class="bg-white p-6 rounded-lg shadow mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-bolt mr-2 text-yellow-500"></i>Universal Super Admin System
-                        </h3>
-                        <p class="text-sm text-gray-600 mb-4">
-                            Automatically promotes existing users to super admin when environment variables change. Real-time sync runs every 10 seconds.
-                        </p>
-                        
-                        <!-- System Status Cards -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                            <div class="bg-blue-50 p-4 rounded-lg">
-                                <h4 class="text-sm font-semibold text-blue-700 mb-2">Current Super Admin</h4>
-                                <p id="currentSuperAdminEmail" class="text-lg font-medium">Loading...</p>
-                                <p id="currentSuperAdminId" class="text-xs text-gray-500">Loading...</p>
-                            </div>
-                            <div class="bg-green-50 p-4 rounded-lg">
-                                <h4 class="text-sm font-semibold text-green-700 mb-2">Environment Target</h4>
-                                <p id="environmentTargetEmail" class="text-lg font-medium">Loading...</p>
-                                <p id="environmentStatus" class="text-xs text-gray-500">Loading...</p>
-                            </div>
-                            <div class="bg-yellow-50 p-4 rounded-lg">
-                                <h4 class="text-sm font-semibold text-yellow-700 mb-2">Sync Status</h4>
-                                <p id="syncStatus" class="text-lg font-medium">Loading...</p>
-                                <p id="lastSync" class="text-xs text-gray-500">Loading...</p>
-                            </div>
-                            <div class="bg-purple-50 p-4 rounded-lg">
-                                <h4 class="text-sm font-semibold text-purple-700 mb-2">System Status</h4>
-                                <p id="systemStatus" class="text-lg font-medium">Loading...</p>
-                                <p id="actionTaken" class="text-xs text-gray-500">Loading...</p>
-                            </div>
-                        </div>
-                        
-                        <div class="flex flex-wrap gap-4">
-                            <button id="syncSuperAdminBtn" 
-                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                                <i class="fas fa-sync mr-2"></i>Sync Now
-                            </button>
-                            
-                            <button id="getSystemSummaryBtn" 
-                                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                                <i class="fas fa-info-circle mr-2"></i>System Summary
-                            </button>
-                            
-                            <button id="promoteUserBtn" 
-                                    class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                                <i class="fas fa-user-plus mr-2"></i>Promote User
-                            </button>
-                            
-                            <button id="forceSyncNowBtn" 
-                                    class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                                <i class="fas fa-rocket mr-2"></i>Force Sync Now
-                            </button>
-                            
-                            <button id="cleanupDuplicatesBtn" 
-                                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                                <i class="fas fa-broom mr-2"></i>Cleanup Duplicates
-                            </button>
-                            
-                            <button id="refreshStatusBtn" 
-                                    class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                                <i class="fas fa-refresh mr-2"></i>Refresh Status
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Super Admin Information -->
-                    <div class="bg-white p-6 rounded-lg shadow">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-info-circle mr-2 text-blue-500"></i>Universal Super Admin Information
-                        </h3>
-                        
-                        <div class="space-y-4">
-                            <div class="bg-indigo-50 border border-indigo-200 rounded-md p-4">
-                                <div class="flex">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-lightbulb text-indigo-400"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <h4 class="text-sm font-medium text-indigo-800">Universal System Logic</h4>
-                                        <div class="mt-2 text-sm text-indigo-700">
-                                            <ul class="space-y-1">
-                                                <li>• <strong>Existing User Priority:</strong> If a user exists with the target email, they get promoted (no duplicates)</li>
-                                                <li>• <strong>Data Preservation:</strong> All user data, chat history, and preferences are maintained</li>
-                                                <li>• <strong>Safe Transitions:</strong> Previous super admin is demoted to admin (never deleted)</li>
-                                                <li>• <strong>Auto-Sync:</strong> Monitors environment variables every 10 seconds</li>
-                                                <li>• <strong>Conflict Resolution:</strong> Automatically handles duplicate emails and multiple super admins</li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-green-50 border border-green-200 rounded-md p-4">
-                                <div class="flex">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-cogs text-green-400"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <h4 class="text-sm font-medium text-green-800">How It Works</h4>
-                                        <div class="mt-2 text-sm text-green-700">
-                                            <ol class="list-decimal list-inside space-y-1">
-                                                <li>Set <code class="bg-gray-100 px-1 rounded">SUPER_ADMIN_EMAIL</code> and <code class="bg-gray-100 px-1 rounded">SUPER_ADMIN_PASSWORD</code> in Railway</li>
-                                                <li>System automatically detects if user already exists with that email</li>
-                                                <li>If user exists: Promotes them to super admin with new password</li>
-                                                <li>If user doesn't exist: Creates new super admin account</li>
-                                                <li>Previous super admin (if different) is safely demoted to admin role</li>
-                                            </ol>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                                <div class="flex">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <h4 class="text-sm font-medium text-yellow-800">Important Notes</h4>
-                                        <div class="mt-2 text-sm text-yellow-700">
-                                            <p>This system works with <strong>any email address</strong> - it's not limited to specific users. Simply update the environment variables to promote any existing user or create a new super admin.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                            
-                            <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
-                                <div class="flex">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-lightbulb text-blue-400"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <h4 class="text-sm font-medium text-blue-800">Real-time Sync</h4>
-                                        <div class="mt-2 text-sm text-blue-700">
-                                            <p>Changes to RAILWAY_SUPER_ADMIN_EMAIL and RAILWAY_SUPER_ADMIN_PASSWORD are detected automatically every 10 seconds.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-green-50 border border-green-200 rounded-md p-4">
-                                <div class="flex">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-shield-alt text-green-400"></i>
-                                    </div>
-                                    <div class="ml-3">
-                                        <h4 class="text-sm font-medium text-green-800">Protection</h4>
-                                        <div class="mt-2 text-sm text-green-700">
-                                            <p>Super Admin accounts cannot be deleted or modified through the admin portal interface.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>

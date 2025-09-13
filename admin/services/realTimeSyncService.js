@@ -44,18 +44,24 @@ class RealTimeSyncService {
       // This will handle all the logic for promoting users, creating new ones, etc.
       const result = await SuperAdminService.updateSuperAdminCredentials();
       
+      // Handle different response formats
+      if (!result) {
+        console.log('⏭️ Sync skipped: No super admin environment variables set');
+        return;
+      }
+      
       if (result.status === 'success') {
         console.log('✅ Instant sync check completed successfully');
       } else if (result.status === 'skipped') {
         console.log('⏭️ Sync skipped:', result.reason);
       } else if (result.status === 'error') {
         console.error('❌ Sync error:', result.error);
-        
-        // Handle duplicate email errors specifically
-        if (result.error.includes('E11000') || result.error.includes('duplicate key')) {
-          console.log('🔧 Duplicate key detected, attempting cleanup...');
-          await this.handleDuplicateEmailError(new Error(result.error));
-        }
+      } else if (result.converted) {
+        console.log('✅ User successfully converted to super admin:', result.email);
+      } else if (result.created) {
+        console.log('✅ New super admin created successfully');
+      } else {
+        console.log('✅ Instant sync check completed');
       }
 
     } catch (error) {

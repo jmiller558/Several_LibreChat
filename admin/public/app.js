@@ -3,6 +3,7 @@ class AdminPortal {
         this.token = localStorage.getItem('adminToken');
         this.currentPage = 1;
         this.selectedUsers = new Set();
+        this.currentUser = null; // Store current user info for permission checks
         this.init();
     }
 
@@ -240,6 +241,9 @@ class AdminPortal {
         document.getElementById('mainApp').classList.remove('hidden');
         document.getElementById('userInfo').textContent = `Welcome, ${user.name}`;
         
+        // Store current user for permission checks
+        this.currentUser = user;
+        
         this.loadDashboard();
     }
 
@@ -266,16 +270,13 @@ class AdminPortal {
                 this.loadUsers();
                 break;
             case 'security':
-                this.loadSecurityDashboard();
+                this.loadSecuritySection();
                 break;
             case 'statistics':
                 this.loadStatistics();
                 break;
             case 'database':
                 this.loadDatabase();
-                break;
-            case 'super-admin':
-                this.loadSuperAdminSection();
                 break;
         }
     }
@@ -387,18 +388,24 @@ class AdminPortal {
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     ${user.role !== 'SUPER_ADMIN' ? `
-                        <button onclick="adminPortal.toggleUserRole('${user._id}', '${user.role}')" 
-                                class="text-blue-600 hover:text-blue-900 mr-3">
-                            ${user.role === 'ADMIN' ? 'Remove Admin' : 'Make Admin'}
-                        </button>
-                        <button onclick="adminPortal.toggleUserBan('${user._id}', ${user.banned})" 
-                                class="text-yellow-600 hover:text-yellow-900 mr-3">
-                            ${user.banned ? 'Unban' : 'Ban'}
-                        </button>
-                        <button onclick="adminPortal.deleteUser('${user._id}')" 
-                                class="text-red-600 hover:text-red-900">
-                            Delete
-                        </button>
+                        ${this.canManageUser(user) ? `
+                            <button onclick="adminPortal.toggleUserRole('${user._id}', '${user.role}')" 
+                                    class="text-blue-600 hover:text-blue-900 mr-3">
+                                ${user.role === 'ADMIN' ? 'Remove Admin' : 'Make Admin'}
+                            </button>
+                            <button onclick="adminPortal.toggleUserBan('${user._id}', ${user.banned})" 
+                                    class="text-yellow-600 hover:text-yellow-900 mr-3">
+                                ${user.banned ? 'Unban' : 'Ban'}
+                            </button>
+                            <button onclick="adminPortal.deleteUser('${user._id}')" 
+                                    class="text-red-600 hover:text-red-900">
+                                Delete
+                            </button>
+                        ` : `
+                            <span class="text-sm text-gray-500">
+                                <i class="fas fa-lock mr-1"></i>Admin Protected
+                            </span>
+                        `}
                     ` : `
                         <span class="protected-text text-xs">
                             <i class="fas fa-shield-alt mr-1"></i>Protected
@@ -463,6 +470,21 @@ class AdminPortal {
         }
     }
 
+    canManageUser(targetUser) {
+        // Super admins can manage anyone (except other super admins, which is handled separately)
+        if (this.currentUser && this.currentUser.isSuperAdmin) {
+            return true;
+        }
+        
+        // Regular admins cannot manage other admins
+        if (targetUser.role === 'ADMIN') {
+            return false;
+        }
+        
+        // Regular admins can manage regular users
+        return true;
+    }
+
     async deleteUser(userId) {
         if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
             return;
@@ -494,6 +516,24 @@ class AdminPortal {
         }
 
         const userIds = Array.from(this.selectedUsers);
+        
+        // Check if any selected users are admins and current user is not super admin
+        if (!this.currentUser?.isSuperAdmin && action !== 'verify') {
+            const userRows = document.querySelectorAll('#usersTable tbody tr');
+            const hasAdminUsers = Array.from(userRows).some(row => {
+                const checkbox = row.querySelector('input[type="checkbox"]');
+                const roleSpan = row.querySelector('td:nth-child(4) span');
+                return checkbox && 
+                       userIds.includes(checkbox.value) && 
+                       (roleSpan?.textContent.includes('ADMIN') || roleSpan?.textContent.includes('SUPER ADMIN'));
+            });
+            
+            if (hasAdminUsers) {
+                alert('You cannot perform bulk operations on admin users. Only super admins can manage other admins.');
+                return;
+            }
+        }
+        
         const confirmMessage = `Are you sure you want to ${action} ${userIds.length} user(s)?`;
         
         if (!confirm(confirmMessage)) {
@@ -748,7 +788,8 @@ class AdminPortal {
                     y: {
                         beginAtZero: true,
                         ticks: {
-                            stepSize: 1
+                            maxTicksLimit: 6,
+                            precision: 0
                         }
                     }
                 },
@@ -787,7 +828,8 @@ class AdminPortal {
                     y: {
                         beginAtZero: true,
                         ticks: {
-                            stepSize: 1
+                            maxTicksLimit: 6,
+                            precision: 0
                         }
                     }
                 },
@@ -860,8 +902,30 @@ class AdminPortal {
     }
 
     // Super Admin Management Functions
-    async loadSuperAdminSection() {
+    async loadSecuritySection() {
+        // Load both security stats and super admin status
+        this.loadSecurityStats();
         this.refreshSuperAdminStatus();
+    }
+
+    async loadSecurityStats() {
+        try {
+            const response = await fetch('/api/admin/stats', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Update security-specific stats
+                document.getElementById('bannedUsers').textContent = data.statistics.users.banned || 0;
+                document.getElementById('unverifiedUsers').textContent = data.statistics.users.unverified || 0;
+                document.getElementById('adminCount').textContent = data.statistics.users.admin || 0;
+            }
+        } catch (error) {
+            console.error('Error loading security stats:', error);
+        }
     }
 
     async refreshSuperAdminStatus() {

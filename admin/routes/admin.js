@@ -76,7 +76,7 @@ router.get('/users', verifyAdmin, async (req, res) => {
   }
 });
 
-// Update user role with super admin protection
+// Update user role with admin protection
 router.put('/users/:userId/role', verifyAdmin, protectSuperAdmin, async (req, res) => {
   try {
     const { role } = req.body;
@@ -89,15 +89,22 @@ router.put('/users/:userId/role', verifyAdmin, protectSuperAdmin, async (req, re
       return res.status(403).json({ error: 'Only super admin can create admin users' });
     }
 
+    // Check if user exists and get their current role before updating
+    const existingUser = await User.findById(req.params.userId);
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Prevent regular admins from changing other admins' roles
+    if (existingUser.role === 'ADMIN' && !req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Admin users can only be managed by super admins' });
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.userId,
       { role },
       { new: true }
     ).select('-password -refreshToken -totpSecret');
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
 
     res.json({ message: 'User role updated successfully', user });
   } catch (error) {
@@ -105,7 +112,7 @@ router.put('/users/:userId/role', verifyAdmin, protectSuperAdmin, async (req, re
   }
 });
 
-// Ban/unban user with super admin protection
+// Ban/unban user with admin protection
 router.post('/users/:userId/ban', verifyAdmin, protectSuperAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
@@ -115,6 +122,11 @@ router.post('/users/:userId/ban', verifyAdmin, protectSuperAdmin, async (req, re
 
     if (user.isSuperAdmin) {
       return res.status(403).json({ error: 'Super admin cannot be banned' });
+    }
+
+    // Prevent regular admins from banning other admins
+    if (user.role === 'ADMIN' && !req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Admin users can only be managed by super admins' });
     }
 
     // Toggle ban status
@@ -136,7 +148,7 @@ router.post('/users/:userId/ban', verifyAdmin, protectSuperAdmin, async (req, re
   }
 });
 
-// Delete user with super admin protection
+// Delete user with admin protection
 router.delete('/users/:userId', verifyAdmin, protectSuperAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
@@ -144,8 +156,23 @@ router.delete('/users/:userId', verifyAdmin, protectSuperAdmin, async (req, res)
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Super admin cannot be deleted
     if (user.isSuperAdmin) {
       return res.status(403).json({ error: 'Super admin cannot be deleted' });
+    }
+
+    // Only super admin can delete admin users
+    if (user.role === 'ADMIN' && !req.user.isSuperAdmin) {
+      return res.status(403).json({ 
+        error: 'Only super admin can delete admin users' 
+      });
+    }
+
+    // Prevent admins from deleting other admins (even if not explicitly ADMIN role)
+    if ((user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && req.user.role === 'ADMIN') {
+      return res.status(403).json({ 
+        error: 'Admin users cannot delete other admin users' 
+      });
     }
 
     // Delete user's conversations and messages
@@ -458,7 +485,7 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// Bulk user operations
+// Bulk user operations with admin protection
 router.post('/users/bulk', verifyAdmin, async (req, res) => {
   try {
     const { action, userIds, data } = req.body;
@@ -467,23 +494,41 @@ router.post('/users/bulk', verifyAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid request format' });
     }
 
+    // Check if any of the target users are admins
+    const targetUsers = await User.find({ _id: { $in: userIds } }).select('role isSuperAdmin');
+    const hasAdminUsers = targetUsers.some(user => user.role === 'ADMIN' || user.isSuperAdmin);
+    
+    // Prevent regular admins from bulk managing other admins
+    if (hasAdminUsers && !req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Admin users can only be managed by super admins' });
+    }
+
+    // Filter out super admins from all operations
+    const nonSuperAdminIds = targetUsers
+      .filter(user => !user.isSuperAdmin)
+      .map(user => user._id);
+
+    if (nonSuperAdminIds.length === 0) {
+      return res.status(400).json({ error: 'No valid users to process after filtering' });
+    }
+
     let result;
     switch (action) {
       case 'ban':
         result = await User.updateMany(
-          { _id: { $in: userIds } },
+          { _id: { $in: nonSuperAdminIds } },
           { banned: true, bannedAt: new Date(), bannedBy: req.user._id }
         );
         break;
       case 'unban':
         result = await User.updateMany(
-          { _id: { $in: userIds } },
+          { _id: { $in: nonSuperAdminIds } },
           { banned: false, $unset: { bannedAt: 1, bannedBy: 1 } }
         );
         break;
       case 'verify':
         result = await User.updateMany(
-          { _id: { $in: userIds } },
+          { _id: { $in: nonSuperAdminIds } },
           { emailVerified: true }
         );
         break;
@@ -491,8 +536,12 @@ router.post('/users/bulk', verifyAdmin, async (req, res) => {
         if (!data?.role || !['USER', 'ADMIN'].includes(data.role)) {
           return res.status(400).json({ error: 'Invalid role' });
         }
+        // Additional check for creating admins
+        if (data.role === 'ADMIN' && !req.user.isSuperAdmin) {
+          return res.status(403).json({ error: 'Only super admin can create admin users' });
+        }
         result = await User.updateMany(
-          { _id: { $in: userIds } },
+          { _id: { $in: nonSuperAdminIds } },
           { role: data.role }
         );
         break;
@@ -502,7 +551,8 @@ router.post('/users/bulk', verifyAdmin, async (req, res) => {
 
     res.json({ 
       message: `Bulk ${action} completed successfully`,
-      modifiedCount: result.modifiedCount 
+      modifiedCount: result.modifiedCount,
+      skippedCount: userIds.length - nonSuperAdminIds.length
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
