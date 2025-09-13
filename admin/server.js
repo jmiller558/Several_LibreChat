@@ -8,7 +8,6 @@ require('dotenv').config();
 const SuperAdminService = require('./services/superAdminService');
 const credentialSyncService = require('./services/credentialSyncService');
 const realTimeSyncService = require('./services/realTimeSyncService');
-const realTimeSyncService = require('./services/realTimeSyncService');
 
 const app = express();
 const PORT = process.env.PORT || process.env.ADMIN_PORT || 4000;
