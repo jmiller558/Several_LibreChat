@@ -173,6 +173,10 @@
                         <i class="fas fa-database mr-3"></i>
                         Database
                     </a>
+                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="super-admin">
+                        <i class="fas fa-crown mr-3 text-red-500"></i>
+                        Super Admin
+                    </a>
                 </nav>
             </aside>
 
@@ -569,6 +573,130 @@
                     <div class="bg-white p-6 rounded-lg shadow">
                         <div id="databaseInfo">
                             <p>Loading database information...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Super Admin Section -->
+                <div id="super-admin-section" class="section hidden">
+                    <h2 class="text-2xl font-bold mb-6 text-red-600">
+                        <i class="fas fa-crown mr-2"></i>Super Admin Management
+                    </h2>
+                    
+                    <!-- Status Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-red-100 text-red-500">
+                                    <i class="fas fa-shield-alt text-xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <h3 class="text-lg font-semibold text-gray-900">Super Admin Status</h3>
+                                    <p id="superAdminStatus" class="text-sm text-gray-600">Checking...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-blue-100 text-blue-500">
+                                    <i class="fas fa-sync text-xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <h3 class="text-lg font-semibold text-gray-900">Sync Status</h3>
+                                    <p id="syncStatus" class="text-sm text-gray-600">Ready</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-green-100 text-green-500">
+                                    <i class="fas fa-clock text-xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <h3 class="text-lg font-semibold text-gray-900">Last Sync</h3>
+                                    <p id="lastSyncTime" class="text-sm text-gray-600">Never</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Instant Sync Controls -->
+                    <div class="bg-white p-6 rounded-lg shadow mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                            <i class="fas fa-bolt mr-2 text-yellow-500"></i>Instant Sync Controls
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Real-time synchronization runs every 10 seconds. Use manual sync for immediate updates.
+                        </p>
+                        
+                        <div class="flex space-x-4">
+                            <button id="syncSuperAdminBtn" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                                <i class="fas fa-sync mr-2"></i>Manual Sync
+                            </button>
+                            
+                            <button id="forceSyncBtn" 
+                                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>Force Environment Sync
+                            </button>
+                            
+                            <button id="refreshStatusBtn" 
+                                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                                <i class="fas fa-refresh mr-2"></i>Refresh Status
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Super Admin Information -->
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                            <i class="fas fa-info-circle mr-2 text-blue-500"></i>Super Admin Information
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h4 class="text-sm font-medium text-yellow-800">Important</h4>
+                                        <div class="mt-2 text-sm text-yellow-700">
+                                            <p>Super Admin credentials are automatically synchronized with Railway environment variables.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-lightbulb text-blue-400"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h4 class="text-sm font-medium text-blue-800">Real-time Sync</h4>
+                                        <div class="mt-2 text-sm text-blue-700">
+                                            <p>Changes to RAILWAY_SUPER_ADMIN_EMAIL and RAILWAY_SUPER_ADMIN_PASSWORD are detected automatically every 10 seconds.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-green-50 border border-green-200 rounded-md p-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-shield-alt text-green-400"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h4 class="text-sm font-medium text-green-800">Protection</h4>
+                                        <div class="mt-2 text-sm text-green-700">
+                                            <p>Super Admin accounts cannot be deleted or modified through the admin portal interface.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

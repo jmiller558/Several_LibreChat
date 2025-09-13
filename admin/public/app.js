@@ -96,6 +96,25 @@ class AdminPortal {
             this.currentPage++;
             this.loadUsers();
         });
+
+        // Super Admin event listeners
+        if (document.getElementById('syncSuperAdminBtn')) {
+            document.getElementById('syncSuperAdminBtn').addEventListener('click', () => {
+                this.syncSuperAdmin();
+            });
+        }
+
+        if (document.getElementById('forceSyncBtn')) {
+            document.getElementById('forceSyncBtn').addEventListener('click', () => {
+                this.forceEnvironmentSync();
+            });
+        }
+
+        if (document.getElementById('refreshStatusBtn')) {
+            document.getElementById('refreshStatusBtn').addEventListener('click', () => {
+                this.refreshSuperAdminStatus();
+            });
+        }
     }
 
     setupBulkActions() {
@@ -230,6 +249,9 @@ class AdminPortal {
                 break;
             case 'database':
                 this.loadDatabase();
+                break;
+            case 'super-admin':
+                this.loadSuperAdminSection();
                 break;
         }
     }
@@ -811,6 +833,161 @@ class AdminPortal {
         } catch (error) {
             console.error('Failed to load database info:', error);
         }
+    }
+
+    // Super Admin Management Functions
+    async loadSuperAdminSection() {
+        this.refreshSuperAdminStatus();
+    }
+
+    async refreshSuperAdminStatus() {
+        try {
+            // Update status indicators
+            document.getElementById('syncStatus').textContent = 'Checking...';
+            
+            const response = await fetch('/api/health/super-admin-status', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Update super admin status
+                const statusElement = document.getElementById('superAdminStatus');
+                if (data.superAdminExists) {
+                    statusElement.textContent = '✅ Active';
+                    statusElement.className = 'text-sm text-green-600';
+                } else {
+                    statusElement.textContent = '❌ Not Found';
+                    statusElement.className = 'text-sm text-red-600';
+                }
+                
+                // Update sync status
+                document.getElementById('syncStatus').textContent = data.syncEnabled ? '🟢 Enabled' : '🔴 Disabled';
+                
+                // Update last sync time
+                const lastSyncElement = document.getElementById('lastSyncTime');
+                if (data.lastSync) {
+                    lastSyncElement.textContent = new Date(data.lastSync).toLocaleString();
+                } else {
+                    lastSyncElement.textContent = 'Never';
+                }
+                
+            } else {
+                document.getElementById('superAdminStatus').textContent = 'Error checking status';
+                document.getElementById('syncStatus').textContent = 'Error';
+            }
+        } catch (error) {
+            console.error('Failed to check super admin status:', error);
+            document.getElementById('superAdminStatus').textContent = 'Error';
+            document.getElementById('syncStatus').textContent = 'Error';
+        }
+    }
+
+    async syncSuperAdmin() {
+        try {
+            document.getElementById('syncStatus').textContent = 'Syncing...';
+            
+            const response = await fetch('/api/health/sync-super-admin-instant', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.showMessage('Super Admin sync completed successfully!', 'success');
+                
+                // Refresh status after sync
+                setTimeout(() => {
+                    this.refreshSuperAdminStatus();
+                }, 1000);
+                
+            } else {
+                const error = await response.json();
+                this.showMessage(`Sync failed: ${error.error || 'Unknown error'}`, 'error');
+                document.getElementById('syncStatus').textContent = 'Sync Failed';
+            }
+        } catch (error) {
+            console.error('Failed to sync super admin:', error);
+            this.showMessage('Sync failed: Network error', 'error');
+            document.getElementById('syncStatus').textContent = 'Sync Failed';
+        }
+    }
+
+    async forceEnvironmentSync() {
+        if (!confirm('This will force synchronization with Railway environment variables. Continue?')) {
+            return;
+        }
+        
+        try {
+            document.getElementById('syncStatus').textContent = 'Force syncing...';
+            
+            const response = await fetch('/api/health/force-env-sync', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.showMessage('Environment sync completed successfully!', 'success');
+                
+                // Refresh status after sync
+                setTimeout(() => {
+                    this.refreshSuperAdminStatus();
+                }, 1000);
+                
+            } else {
+                const error = await response.json();
+                this.showMessage(`Force sync failed: ${error.error || 'Unknown error'}`, 'error');
+                document.getElementById('syncStatus').textContent = 'Force Sync Failed';
+            }
+        } catch (error) {
+            console.error('Failed to force sync:', error);
+            this.showMessage('Force sync failed: Network error', 'error');
+            document.getElementById('syncStatus').textContent = 'Force Sync Failed';
+        }
+    }
+
+    showMessage(message, type = 'info') {
+        // Create or update message element
+        let messageElement = document.getElementById('adminMessage');
+        if (!messageElement) {
+            messageElement = document.createElement('div');
+            messageElement.id = 'adminMessage';
+            messageElement.className = 'fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50';
+            document.body.appendChild(messageElement);
+        }
+        
+        // Set message content and styling
+        messageElement.textContent = message;
+        messageElement.className = 'fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50';
+        
+        switch (type) {
+            case 'success':
+                messageElement.className += ' bg-green-500 text-white';
+                break;
+            case 'error':
+                messageElement.className += ' bg-red-500 text-white';
+                break;
+            case 'warning':
+                messageElement.className += ' bg-yellow-500 text-white';
+                break;
+            default:
+                messageElement.className += ' bg-blue-500 text-white';
+        }
+        
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            if (messageElement && messageElement.parentNode) {
+                messageElement.parentNode.removeChild(messageElement);
+            }
+        }, 3000);
     }
 }
 
