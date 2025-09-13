@@ -87,4 +87,43 @@ router.get('/health', (req, res) => {
   });
 });
 
+// Debug super admin endpoint (temporary for troubleshooting)
+router.get('/debug-super-admin', async (req, res) => {
+  try {
+    const User = require('../models/User');
+    
+    // Get all super admins
+    const superAdmins = await User.find({ isSuperAdmin: true }).select('email role isSuperAdmin createdAt');
+    
+    // Get environment variables
+    const envVars = {
+      email: process.env.SUPER_ADMIN_EMAIL,
+      passwordSet: !!process.env.SUPER_ADMIN_PASSWORD,
+      mongoUri: process.env.MONGO_URI ? '[SET]' : process.env.DATABASE_URL ? '[SET]' : '[NOT SET]'
+    };
+    
+    // Check for mismatch
+    const hasValidSuperAdmin = superAdmins.length > 0 && 
+                              superAdmins[0].email === envVars.email;
+    
+    res.json({
+      databaseSuperAdmins: superAdmins,
+      environmentVariables: envVars,
+      status: {
+        superAdminExists: superAdmins.length > 0,
+        credentialsMatch: hasValidSuperAdmin,
+        needsFix: !hasValidSuperAdmin
+      },
+      recommendations: hasValidSuperAdmin ? 
+        ['✅ Super admin is properly configured'] : 
+        ['❌ Run npm run fix-super-admin to resolve issues']
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      error: error.message,
+      recommendation: 'Check database connection and try again'
+    });
+  }
+});
+
 module.exports = router;

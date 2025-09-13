@@ -8,7 +8,8 @@
     "dev": "nodemon server.js",
     "create-admin": "node create-admin.js",
     "create-super-admin": "node create-super-admin.js",
-    "test-super-admin": "node test-super-admin.js"
+    "test-super-admin": "node test-super-admin.js",
+    "fix-super-admin": "node fix-super-admin.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -64,6 +64,25 @@ app.listen(PORT, async () => {
   console.log(`🚀 LibreChat Admin Portal running on http://localhost:${PORT}`);
   
   try {
+    // DEBUG: Show current environment variables
+    console.log('\n🔍 Environment Variables Check:');
+    console.log('SUPER_ADMIN_EMAIL:', process.env.SUPER_ADMIN_EMAIL || '[NOT SET]');
+    console.log('SUPER_ADMIN_PASSWORD:', process.env.SUPER_ADMIN_PASSWORD ? '[SET]' : '[NOT SET]');
+    console.log('MONGO_URI:', process.env.MONGO_URI ? '[SET]' : process.env.DATABASE_URL ? '[SET]' : '[NOT SET]');
+    
+    // Check if super admin exists
+    const User = require('./models/User');
+    const existingSuperAdmin = await User.findOne({ isSuperAdmin: true });
+    
+    if (existingSuperAdmin) {
+      console.log('📋 Current Super Admin:', existingSuperAdmin.email);
+      console.log('🔄 Environment Email:', process.env.SUPER_ADMIN_EMAIL);
+      
+      if (existingSuperAdmin.email !== process.env.SUPER_ADMIN_EMAIL) {
+        console.log('⚠️  MISMATCH DETECTED! Run "npm run fix-super-admin" to fix this.');
+      }
+    }
+    
     // Ensure super admin exists on startup
     await SuperAdminService.ensureSuperAdminExists();
     
@@ -72,6 +91,8 @@ app.listen(PORT, async () => {
     realTimeSyncService.startRealTimeMonitoring();
     
     console.log('✅ Super admin services initialized with INSTANT sync!');
+    console.log(`🌐 Debug endpoint: http://localhost:${PORT}/api/health/debug-super-admin`);
+    
   } catch (error) {
     console.error('❌ Error initializing super admin services:', error);
   }
