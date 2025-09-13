@@ -300,6 +300,15 @@ class SuperAdminService {
     }
   }
 
+  static async getAllSuperAdmins() {
+    try {
+      return await User.find({ isSuperAdmin: true }).select('email createdAt updatedAt lastLogin role');
+    } catch (error) {
+      console.error('Error getting all super admins:', error);
+      throw error;
+    }
+  }
+
   static generateNameFromEmail(email) {
     // Generate a reasonable name from email
     const localPart = email.split('@')[0];
