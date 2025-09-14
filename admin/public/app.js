@@ -658,40 +658,133 @@ class AdminPortal {
         }
     }
 
-    loadStatistics() {
-        // Try to load real statistics first, fallback to placeholder if needed
-        this.loadRealStatistics();
-    }
-
-    async loadRealStatistics() {
+    async loadStatistics() {
+        console.log('📊 Loading real statistics from API...');
+        
         try {
-            console.log('Attempting to load real statistics...');
+            const token = localStorage.getItem('token');
+            if (!token) {
+                console.error('❌ No authentication token found');
+                this.showPlaceholderStats();
+                return;
+            }
+
+            console.log('🔑 Making API request with token...');
             const response = await fetch('/api/admin/statistics', {
                 headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
+
+            console.log('📡 API Response status:', response.status);
 
             if (response.ok) {
                 const stats = await response.json();
-                console.log('Real statistics loaded successfully:', stats);
+                console.log('✅ Real statistics loaded successfully:', stats);
+                
+                // Update all statistics with real data
                 this.renderRealStatistics(stats);
+                
+                // Render charts with real data
                 this.renderRealCharts(stats);
+                
+                console.log('🎯 Real statistics and charts rendered');
             } else {
-                console.warn('Failed to load real statistics, status:', response.status);
-                const errorText = await response.text();
-                console.warn('Error response:', errorText);
-                this.loadPlaceholderStatistics();
+                console.error('❌ Failed to load statistics:', response.status, response.statusText);
+                this.showPlaceholderStats();
             }
         } catch (error) {
-            console.error('Error loading real statistics:', error);
-            console.warn('Using placeholder data as fallback');
-            this.loadPlaceholderStatistics();
+            console.error('� Error loading statistics:', error);
+            this.showPlaceholderStats();
         }
     }
 
-    loadPlaceholderStatistics() {
-        // Generate placeholder data
+    renderRealStatistics(stats) {
+        console.log('📊 Rendering real statistics data:', stats);
+        
+        try {
+            // Update overview metrics with real data
+            if (stats.overview) {
+                this.updateElement('statsTotalUsers', stats.overview.totalUsers?.toLocaleString() || '0');
+                this.updateElement('statsTotalMessages', stats.overview.totalMessages?.toLocaleString() || '0');
+                this.updateElement('statsTotalConversations', stats.overview.totalConversations?.toLocaleString() || '0');
+                this.updateElement('statsActiveUsers', stats.overview.activeUsers?.toLocaleString() || '0');
+            }
+
+            // Update growth percentages with real data
+            if (stats.growth) {
+                this.updateElement('statsUserGrowth', `${stats.growth.userGrowth || 0}%`);
+                this.updateElement('statsMessageGrowth', `${stats.growth.messageGrowth || 0}%`);
+                this.updateElement('statsConversationGrowth', `${stats.growth.conversationGrowth || 0}%`);
+                this.updateElement('statsActiveGrowth', `${stats.growth.activeGrowth || 0}%`);
+            }
+
+            // Update user statistics with real data
+            if (stats.users) {
+                this.updateElement('statsRegisteredUsers', stats.users.registered?.toLocaleString() || '0');
+                this.updateElement('statsVerifiedUsers', stats.users.verified?.toLocaleString() || '0');
+                this.updateElement('statsAdminUsers', (stats.users.admin + stats.users.superAdmin || 0).toLocaleString());
+                this.updateElement('statsBannedUsers', stats.users.banned?.toLocaleString() || '0');
+                this.updateElement('stats2FAUsers', stats.users.twoFactor?.toLocaleString() || '0');
+                this.updateElement('statsRecentLogins', stats.users.recentLogins?.toLocaleString() || '0');
+            }
+
+            // Update performance metrics with real data
+            if (stats.performance) {
+                this.updateElement('statsAvgMessages', stats.performance.avgMessagesPerUser || '0');
+                this.updateElement('statsAvgConversations', stats.performance.avgConversationsPerUser || '0');
+                this.updateElement('statsPeakHour', stats.performance.peakHour || 'N/A');
+                this.updateElement('statsDatabaseSize', stats.performance.databaseSize || 'N/A');
+                this.updateElement('statsStorageUsed', stats.performance.storageUsed || 'N/A');
+                
+                // Format uptime from seconds to readable format
+                if (stats.performance.uptime) {
+                    const uptime = this.formatUptime(stats.performance.uptime);
+                    this.updateElement('statsUptime', uptime);
+                }
+            }
+
+            // Update last updated timestamp
+            if (stats.lastUpdated) {
+                const lastUpdated = new Date(stats.lastUpdated).toLocaleString();
+                this.updateElement('statsLastUpdated', lastUpdated);
+            }
+
+            console.log('✅ Real statistics data rendered successfully');
+        } catch (error) {
+            console.error('❌ Error rendering real statistics:', error);
+        }
+    }
+
+    updateElement(id, value) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+            console.log(`✅ Updated ${id}: ${value}`);
+        } else {
+            console.warn(`⚠️ Element not found: ${id}`);
+        }
+    }
+
+    formatUptime(seconds) {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        
+        if (days > 0) {
+            return `${days}d ${hours}h ${minutes}m`;
+        } else if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else {
+            return `${minutes}m`;
+        }
+    }
+
+    showPlaceholderStats() {
+        console.log('📋 Showing placeholder statistics as fallback');
+        
+        // Generate placeholder statistics data
         const placeholderStats = {
             overview: {
                 totalUsers: 1247,
@@ -708,7 +801,8 @@ class AdminPortal {
             users: {
                 registered: 1247,
                 verified: 1089,
-                admin: 3,
+                admin: 2,
+                superAdmin: 1,
                 banned: 12,
                 twoFactor: 234,
                 recentLogins: 89
@@ -717,18 +811,18 @@ class AdminPortal {
                 avgMessagesPerUser: 19.9,
                 avgConversationsPerUser: 4.7,
                 peakHour: '2:00 PM',
-                databaseSize: '2.4 GB',
-                storageUsed: '1.8 GB',
+                databaseSize: '2.4 MB',
+                storageUsed: '0.002 GB',
                 uptime: 432000 // 5 days in seconds
             },
             lastUpdated: new Date().toISOString()
         };
 
-        // Generate chart data
-        const chartData = this.generatePlaceholderChartData();
+        // Render placeholder statistics
+        this.renderRealStatistics(placeholderStats);
         
-        this.renderStatistics(placeholderStats);
-        this.renderCharts(chartData);
+        // Show placeholder charts
+        this.showPlaceholderCharts();
     }
 
     generatePlaceholderChartData() {
@@ -758,37 +852,70 @@ class AdminPortal {
         };
     }
 
+    loadTestCharts() {
+        console.log('📊 Loading test charts...');
+        
+        // Simple test data
+        const testData = {
+            userGrowth: [
+                { date: 'Sep 8', count: 5 },
+                { date: 'Sep 9', count: 8 },
+                { date: 'Sep 10', count: 12 },
+                { date: 'Sep 11', count: 15 },
+                { date: 'Sep 12', count: 10 },
+                { date: 'Sep 13', count: 18 },
+                { date: 'Sep 14', count: 22 }
+            ],
+            messageActivity: [
+                { date: 'Sep 8', count: 25 },
+                { date: 'Sep 9', count: 32 },
+                { date: 'Sep 10', count: 45 },
+                { date: 'Sep 11', count: 38 },
+                { date: 'Sep 12', count: 52 },
+                { date: 'Sep 13', count: 41 },
+                { date: 'Sep 14', count: 65 }
+            ]
+        };
+
+        try {
+            this.renderCharts(testData);
+            console.log('✅ Test charts rendered successfully');
+        } catch (error) {
+            console.error('❌ Error rendering test charts:', error);
+        }
+    }
+
     renderRealStatistics(stats) {
-        // Update overview metrics
-        document.getElementById('statsTotalUsers').textContent = stats.users?.total?.toLocaleString() || '0';
-        document.getElementById('statsTotalMessages').textContent = stats.messages?.total?.toLocaleString() || '0';
-        document.getElementById('statsTotalConversations').textContent = stats.conversations?.total?.toLocaleString() || '0';
-        document.getElementById('statsActiveUsers').textContent = stats.users?.active?.toLocaleString() || '0';
+        // Update overview metrics using correct element IDs
+        document.getElementById('statsTotalUsers').textContent = stats.overview?.totalUsers?.toLocaleString() || '0';
+        document.getElementById('statsTotalMessages').textContent = stats.overview?.totalMessages?.toLocaleString() || '0';
+        document.getElementById('statsTotalConversations').textContent = stats.overview?.totalConversations?.toLocaleString() || '0';
+        document.getElementById('statsActiveUsers').textContent = stats.overview?.activeUsers?.toLocaleString() || '0';
 
         // Update growth percentages (calculate from data if available)
-        document.getElementById('statsUserGrowth').textContent = stats.growth?.users || '0';
-        document.getElementById('statsMessageGrowth').textContent = stats.growth?.messages || '0';
-        document.getElementById('statsConversationGrowth').textContent = stats.growth?.conversations || '0';
-        document.getElementById('statsActiveGrowth').textContent = stats.growth?.active || '0';
+        document.getElementById('statsUserGrowth').textContent = stats.growth?.userGrowth || '0';
+        document.getElementById('statsMessageGrowth').textContent = stats.growth?.messageGrowth || '0';
+        document.getElementById('statsConversationGrowth').textContent = stats.growth?.conversationGrowth || '0';
+        document.getElementById('statsActiveGrowth').textContent = stats.growth?.activeGrowth || '0';
 
         // Update user statistics
-        document.getElementById('statsRegisteredUsers').textContent = stats.users?.total?.toLocaleString() || '0';
+        document.getElementById('statsRegisteredUsers').textContent = stats.users?.registered?.toLocaleString() || '0';
         document.getElementById('statsVerifiedUsers').textContent = stats.users?.verified?.toLocaleString() || '0';
         document.getElementById('statsAdminUsers').textContent = stats.users?.admin?.toLocaleString() || '0';
         document.getElementById('statsBannedUsers').textContent = stats.users?.banned?.toLocaleString() || '0';
         document.getElementById('stats2FAUsers').textContent = stats.users?.twoFactor?.toLocaleString() || '0';
-        document.getElementById('statsRecentLogins').textContent = stats.activity?.recentLogins?.toLocaleString() || '0';
+        document.getElementById('statsRecentLogins').textContent = stats.users?.recentLogins?.toLocaleString() || '0';
 
         // Update performance metrics
         document.getElementById('statsAvgMessages').textContent = stats.performance?.avgMessagesPerUser || '0';
         document.getElementById('statsAvgConversations').textContent = stats.performance?.avgConversationsPerUser || '0';
         document.getElementById('statsPeakHour').textContent = stats.performance?.peakHour || 'N/A';
-        document.getElementById('statsDatabaseSize').textContent = stats.system?.databaseSize || 'N/A';
-        document.getElementById('statsStorageUsed').textContent = stats.system?.storageUsed || 'N/A';
+        document.getElementById('statsDatabaseSize').textContent = stats.performance?.databaseSize || 'N/A';
+        document.getElementById('statsStorageUsed').textContent = stats.performance?.storageUsed || 'N/A';
         
         // Format uptime
-        if (stats.system?.uptime) {
-            const uptime = stats.system.uptime;
+        if (stats.performance?.uptime) {
+            const uptime = stats.performance.uptime;
             const days = Math.floor(uptime / 86400);
             const hours = Math.floor((uptime % 86400) / 3600);
             const minutes = Math.floor((uptime % 3600) / 60);
@@ -802,26 +929,165 @@ class AdminPortal {
     }
 
     renderRealCharts(stats) {
-        // Use real chart data if available, otherwise generate placeholder
-        let chartData;
+        console.log('📈 Rendering real charts with data:', stats.charts);
         
-        if (stats.charts && stats.charts.userGrowth && stats.charts.messageActivity) {
-            chartData = {
-                userGrowth: stats.charts.userGrowth.map(item => ({
-                    date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                    count: item.count
-                })),
-                messageActivity: stats.charts.messageActivity.map(item => ({
-                    date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                    count: item.count
-                }))
-            };
-        } else {
-            // Generate placeholder chart data if real data not available
-            chartData = this.generatePlaceholderChartData();
+        try {
+            // Destroy existing charts if they exist
+            if (window.userGrowthChart) {
+                window.userGrowthChart.destroy();
+            }
+            if (window.messageActivityChart) {
+                window.messageActivityChart.destroy();
+            }
+
+            // User Growth Chart with real data
+            const userCtx = document.getElementById('userGrowthChart');
+            if (userCtx && stats.charts && stats.charts.userGrowth) {
+                const userGrowthData = stats.charts.userGrowth;
+                const labels = userGrowthData.map(item => {
+                    const date = new Date(item.date);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                });
+                const data = userGrowthData.map(item => item.count);
+                
+                console.log('📊 User Growth Chart - Labels:', labels);
+                console.log('📊 User Growth Chart - Data:', data);
+
+                window.userGrowthChart = new Chart(userCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'New Users',
+                            data: data,
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#3B82F6',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log('✅ Real user growth chart created');
+            }
+
+            // Message Activity Chart with real data
+            const messageCtx = document.getElementById('messageActivityChart');
+            if (messageCtx && stats.charts && stats.charts.messageActivity) {
+                const messageActivityData = stats.charts.messageActivity;
+                const labels = messageActivityData.map(item => item.date);
+                const data = messageActivityData.map(item => item.count);
+                
+                console.log('📊 Message Activity Chart - Labels:', labels);
+                console.log('📊 Message Activity Chart - Data:', data);
+
+                window.messageActivityChart = new Chart(messageCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Messages',
+                            data: data,
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            borderColor: '#10B981',
+                            borderWidth: 2,
+                            borderRadius: 4,
+                            borderSkipped: false,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)'
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log('✅ Real message activity chart created');
+            }
+
+            console.log('🎯 All real charts rendered successfully');
+        } catch (error) {
+            console.error('❌ Error rendering real charts:', error);
+            // Fallback to placeholder charts
+            this.showPlaceholderCharts();
         }
+    }
+
+    showPlaceholderCharts() {
+        console.log('📋 Showing placeholder charts as fallback');
         
-        this.renderCharts(chartData);
+        // Generate placeholder data
+        const placeholderUserGrowth = [
+            { date: 'Dec 7', count: 2 },
+            { date: 'Dec 8', count: 5 },
+            { date: 'Dec 9', count: 3 },
+            { date: 'Dec 10', count: 8 },
+            { date: 'Dec 11', count: 4 },
+            { date: 'Dec 12', count: 7 },
+            { date: 'Dec 13', count: 6 }
+        ];
+
+        const placeholderMessageActivity = [
+            { date: 'Mon', count: 12 },
+            { date: 'Tue', count: 25 },
+            { date: 'Wed', count: 18 },
+            { date: 'Thu', count: 32 },
+            { date: 'Fri', count: 28 },
+            { date: 'Sat', count: 15 },
+            { date: 'Sun', count: 22 }
+        ];
+
+        // Render placeholder charts
+        this.renderRealCharts({
+            charts: {
+                userGrowth: placeholderUserGrowth,
+                messageActivity: placeholderMessageActivity
+            }
+        });
     }
 
     renderStatistics(stats) {
@@ -874,177 +1140,205 @@ class AdminPortal {
     }
 
     renderCharts(chartData) {
+        console.log('📈 Starting chart rendering with data:', chartData);
+        
         // User Growth Chart
-        const userGrowthCtx = document.getElementById('userGrowthChart').getContext('2d');
+        const userGrowthCanvas = document.getElementById('userGrowthChart');
+        if (!userGrowthCanvas) {
+            console.error('❌ userGrowthChart canvas not found');
+            return;
+        }
+        
+        const userGrowthCtx = userGrowthCanvas.getContext('2d');
+        console.log('🎨 Got user growth chart context');
         
         // Destroy existing chart if it exists
         if (this.userGrowthChart) {
             this.userGrowthChart.destroy();
+            console.log('🗑️ Destroyed existing user growth chart');
         }
 
-        this.userGrowthChart = new Chart(userGrowthCtx, {
-            type: 'line',
-            data: {
-                labels: chartData.userGrowth.map(item => item.date),
-                datasets: [{
-                    label: 'New Users',
-                    data: chartData.userGrowth.map(item => item.count),
-                    borderColor: '#3B82F6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    borderWidth: 3,
-                    tension: 0.4,
-                    fill: true,
-                    pointBackgroundColor: '#3B82F6',
-                    pointBorderColor: '#ffffff',
-                    pointBorderWidth: 2,
-                    pointRadius: 6,
-                    pointHoverRadius: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
+        try {
+            this.userGrowthChart = new Chart(userGrowthCtx, {
+                type: 'line',
+                data: {
+                    labels: chartData.userGrowth.map(item => item.date),
+                    datasets: [{
+                        label: 'New Users',
+                        data: chartData.userGrowth.map(item => item.count),
+                        borderColor: '#3B82F6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#3B82F6',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }]
                 },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            color: '#374151',
-                            font: {
-                                size: 14,
-                                weight: '500'
-                            },
-                            padding: 20
-                        }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     },
-                    tooltip: {
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        titleColor: '#374151',
-                        bodyColor: '#6B7280',
-                        borderColor: '#E5E7EB',
-                        borderWidth: 1,
-                        cornerRadius: 8,
-                        displayColors: false
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
+                    plugins: {
+                        legend: {
                             display: true,
-                            color: 'rgba(229, 231, 235, 0.5)'
-                        },
-                        ticks: {
-                            color: '#6B7280',
-                            font: {
-                                size: 12
+                            position: 'top',
+                            labels: {
+                                color: '#374151',
+                                font: {
+                                    size: 14,
+                                    weight: '500'
+                                },
+                                padding: 20
                             }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#374151',
+                            bodyColor: '#6B7280',
+                            borderColor: '#E5E7EB',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: false
                         }
                     },
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            display: true,
-                            color: 'rgba(229, 231, 235, 0.5)'
+                    scales: {
+                        x: {
+                            grid: {
+                                display: true,
+                                color: 'rgba(229, 231, 235, 0.5)'
+                            },
+                            ticks: {
+                                color: '#6B7280',
+                                font: {
+                                    size: 12
+                                }
+                            }
                         },
-                        ticks: {
-                            maxTicksLimit: 6,
-                            precision: 0,
-                            color: '#6B7280',
-                            font: {
-                                size: 12
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                display: true,
+                                color: 'rgba(229, 231, 235, 0.5)'
+                            },
+                            ticks: {
+                                maxTicksLimit: 6,
+                                precision: 0,
+                                color: '#6B7280',
+                                font: {
+                                    size: 12
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
+            });
+            console.log('✅ User growth chart created successfully');
+        } catch (error) {
+            console.error('❌ Error creating user growth chart:', error);
+        }
 
         // Message Activity Chart
-        const messageActivityCtx = document.getElementById('messageActivityChart').getContext('2d');
+        const messageActivityCanvas = document.getElementById('messageActivityChart');
+        if (!messageActivityCanvas) {
+            console.error('❌ messageActivityChart canvas not found');
+            return;
+        }
+        
+        const messageActivityCtx = messageActivityCanvas.getContext('2d');
+        console.log('🎨 Got message activity chart context');
         
         // Destroy existing chart if it exists
         if (this.messageActivityChart) {
             this.messageActivityChart.destroy();
+            console.log('🗑️ Destroyed existing message activity chart');
         }
 
-        this.messageActivityChart = new Chart(messageActivityCtx, {
-            type: 'bar',
-            data: {
-                labels: chartData.messageActivity.map(item => item.date),
-                datasets: [{
-                    label: 'Messages',
-                    data: chartData.messageActivity.map(item => item.count),
-                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                    borderColor: '#10B981',
-                    borderWidth: 0,
-                    borderRadius: 6,
-                    borderSkipped: false
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
+        try {
+            this.messageActivityChart = new Chart(messageActivityCtx, {
+                type: 'bar',
+                data: {
+                    labels: chartData.messageActivity.map(item => item.date),
+                    datasets: [{
+                        label: 'Messages',
+                        data: chartData.messageActivity.map(item => item.count),
+                        backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                        borderColor: '#10B981',
+                        borderWidth: 0,
+                        borderRadius: 6,
+                        borderSkipped: false
+                    }]
                 },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            color: '#374151',
-                            font: {
-                                size: 14,
-                                weight: '500'
-                            },
-                            padding: 20
-                        }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     },
-                    tooltip: {
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        titleColor: '#374151',
-                        bodyColor: '#6B7280',
-                        borderColor: '#E5E7EB',
-                        borderWidth: 1,
-                        cornerRadius: 8,
-                        displayColors: false
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            color: '#6B7280',
-                            font: {
-                                size: 12
-                            }
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: {
+                    plugins: {
+                        legend: {
                             display: true,
-                            color: 'rgba(229, 231, 235, 0.5)'
+                            position: 'top',
+                            labels: {
+                                color: '#374151',
+                                font: {
+                                    size: 14,
+                                    weight: '500'
+                                },
+                                padding: 20
+                            }
                         },
-                        ticks: {
-                            maxTicksLimit: 6,
-                            precision: 0,
-                            color: '#6B7280',
-                            font: {
-                                size: 12
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#374151',
+                            bodyColor: '#6B7280',
+                            borderColor: '#E5E7EB',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#6B7280',
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                display: true,
+                                color: 'rgba(229, 231, 235, 0.5)'
+                            },
+                            ticks: {
+                                maxTicksLimit: 6,
+                                precision: 0,
+                                color: '#6B7280',
+                                font: {
+                                    size: 12
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
+            });
+            console.log('✅ Message activity chart created successfully');
+        } catch (error) {
+            console.error('❌ Error creating message activity chart:', error);
+        }
     }
 
     async exportStatistics() {
