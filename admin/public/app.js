@@ -704,7 +704,7 @@ class AdminPortal {
         console.log('📊 Rendering real statistics data:', stats);
         
         try {
-            // Update overview metrics with real data
+            // Update main dashboard cards with real data
             if (stats.overview) {
                 this.updateElement('statsTotalUsers', stats.overview.totalUsers?.toLocaleString() || '0');
                 this.updateElement('statsTotalMessages', stats.overview.totalMessages?.toLocaleString() || '0');
@@ -712,15 +712,7 @@ class AdminPortal {
                 this.updateElement('statsActiveUsers', stats.overview.activeUsers?.toLocaleString() || '0');
             }
 
-            // Update growth percentages with real data
-            if (stats.growth) {
-                this.updateElement('statsUserGrowth', `${stats.growth.userGrowth || 0}%`);
-                this.updateElement('statsMessageGrowth', `${stats.growth.messageGrowth || 0}%`);
-                this.updateElement('statsConversationGrowth', `${stats.growth.conversationGrowth || 0}%`);
-                this.updateElement('statsActiveGrowth', `${stats.growth.activeGrowth || 0}%`);
-            }
-
-            // Update user statistics with real data
+            // Update detailed user statistics (for other sections if they exist)
             if (stats.users) {
                 this.updateElement('statsRegisteredUsers', stats.users.registered?.toLocaleString() || '0');
                 this.updateElement('statsVerifiedUsers', stats.users.verified?.toLocaleString() || '0');
@@ -730,7 +722,7 @@ class AdminPortal {
                 this.updateElement('statsRecentLogins', stats.users.recentLogins?.toLocaleString() || '0');
             }
 
-            // Update performance metrics with real data
+            // Update performance metrics (for other sections if they exist)
             if (stats.performance) {
                 this.updateElement('statsAvgMessages', stats.performance.avgMessagesPerUser || '0');
                 this.updateElement('statsAvgConversations', stats.performance.avgConversationsPerUser || '0');
