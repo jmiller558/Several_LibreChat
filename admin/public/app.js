@@ -654,43 +654,11 @@ class AdminPortal {
                 
                 // Update security stats
                 document.getElementById('bannedUsers').textContent = data.stats.bannedUsers;
-                document.getElementById('unverifiedUsers').textContent = data.stats.unverifiedUsers;
-                document.getElementById('twoFactorUsers').textContent = data.stats.twoFactorUsers;
-                document.getElementById('verificationRate').textContent = `${data.stats.verificationRate}%`;
                 document.getElementById('adminCount').textContent = data.stats.adminUsers;
-                document.getElementById('activeSessions').textContent = data.stats.activeSessions;
-
-                // Render security events
-                this.renderSecurityEvents(data.recentEvents);
             }
         } catch (error) {
             console.error('Failed to load security data:', error);
         }
-    }
-
-    renderSecurityEvents(events) {
-        const container = document.getElementById('securityEvents');
-        
-        if (!events || events.length === 0) {
-            container.innerHTML = '<p class="text-gray-500">No recent security events</p>';
-            return;
-        }
-
-        container.innerHTML = events.map(event => `
-            <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded">
-                <div class="flex-shrink-0">
-                    <div class="w-2 h-2 rounded-full ${
-                        event.type === 'ban' ? 'bg-red-500' :
-                        event.type === 'login_attempt' ? 'bg-yellow-500' :
-                        event.type === 'role_change' ? 'bg-blue-500' : 'bg-gray-500'
-                    }"></div>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900">${event.description}</p>
-                    <p class="text-xs text-gray-500">${new Date(event.timestamp).toLocaleString()}</p>
-                </div>
-            </div>
-        `).join('');
     }
 
     loadStatistics() {
@@ -884,7 +852,6 @@ class AdminPortal {
                 const data = await response.json();
                 // Update security-specific stats
                 document.getElementById('bannedUsers').textContent = data.statistics.users.banned || 0;
-                document.getElementById('unverifiedUsers').textContent = data.statistics.users.unverified || 0;
                 document.getElementById('adminCount').textContent = data.statistics.users.admin || 0;
             }
         } catch (error) {
@@ -918,14 +885,6 @@ class AdminPortal {
                 
                 // Update sync status
                 document.getElementById('syncStatus').textContent = data.syncEnabled ? '🟢 Enabled' : '🔴 Disabled';
-                
-                // Update last sync time
-                const lastSyncElement = document.getElementById('lastSyncTime');
-                if (data.lastSync) {
-                    lastSyncElement.textContent = new Date(data.lastSync).toLocaleString();
-                } else {
-                    lastSyncElement.textContent = 'Never';
-                }
                 
             } else {
                 document.getElementById('superAdminStatus').textContent = 'Error checking status';
