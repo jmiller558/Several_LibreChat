@@ -269,9 +269,6 @@ class AdminPortal {
             case 'users':
                 this.loadUsers();
                 break;
-            case 'security':
-                this.loadSecuritySection();
-                break;
             case 'statistics':
                 this.loadStatistics();
                 break;
@@ -833,404 +830,179 @@ class AdminPortal {
         }
     }
 
-    // Super Admin Management Functions
-    async loadSecuritySection() {
-        // Load both security stats and super admin status
-        this.loadSecurityStats();
-        this.refreshSuperAdminStatus();
+    loadStatistics() {
+        this.loadDetailedStatistics();
     }
 
-    async loadSecurityStats() {
+    async loadDetailedStatistics() {
         try {
-            const response = await fetch('/api/admin/stats', {
+            const response = await fetch('/api/admin/statistics', {
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
                 },
             });
 
             if (response.ok) {
-                const data = await response.json();
-                // Update security-specific stats
-                document.getElementById('bannedUsers').textContent = data.statistics.users.banned || 0;
-                document.getElementById('adminCount').textContent = data.statistics.users.admin || 0;
-                
-                // Update total admin count in the new simplified section
-                const totalAdminElement = document.getElementById('totalAdminCount');
-                if (totalAdminElement) {
-                    totalAdminElement.textContent = data.statistics.users.admin || 0;
-                }
+                const stats = await response.json();
+                this.renderStatistics(stats);
+                this.renderCharts(stats.charts);
+            } else {
+                console.error('Failed to load statistics');
             }
         } catch (error) {
-            console.error('Error loading security stats:', error);
+            console.error('Failed to load statistics:', error);
         }
     }
 
-    async refreshSuperAdminStatus() {
-        try {
-            const response = await fetch('/api/health/super-admin-status', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                
-                // Update super admin status card
-                const statusElement = document.getElementById('superAdminStatus');
-                if (statusElement) {
-                    if (data.superAdminExists) {
-                        statusElement.textContent = 'Active';
-                        statusElement.className = 'text-lg font-bold text-red-900';
-                    } else {
-                        statusElement.textContent = 'Not Found';
-                        statusElement.className = 'text-lg font-bold text-red-900';
+    renderStatistics(stats) {
+        // Update total stats
+        document.getElementById('statsTotalUsers').textContent = stats.totalUsers;
+        document.getElementById('statsTotalMessages').textContent = stats.totalMessages;
+        document.getElementById('statsTotalConversations').textContent = stats.totalConversations;
+        document.getElementById('statsActiveUsers').textContent = stats.activeUsers;
+        
+        // Update growth percentages
+        document.getElementById('statsUserGrowth').textContent = stats.userGrowth;
+        document.getElementById('statsMessageGrowth').textContent = stats.messageGrowth;
+        document.getElementById('statsConversationGrowth').textContent = stats.conversationGrowth;
+        document.getElementById('statsActiveGrowth').textContent = stats.activeGrowth;
+        
+        // Update detailed statistics
+        document.getElementById('statsRegisteredUsers').textContent = stats.registeredUsers;
+        document.getElementById('statsVerifiedUsers').textContent = stats.verifiedUsers;
+        document.getElementById('statsAdminUsers').textContent = stats.adminUsers;
+        document.getElementById('statsBannedUsers').textContent = stats.bannedUsers;
+        document.getElementById('stats2FAUsers').textContent = stats.twoFAUsers;
+        document.getElementById('statsRecentLogins').textContent = stats.recentLogins;
+        
+        // Update performance metrics
+        document.getElementById('statsAvgMessages').textContent = stats.avgMessages;
+        document.getElementById('statsAvgConversations').textContent = stats.avgConversations;
+        document.getElementById('statsPeakHour').textContent = stats.peakHour;
+        document.getElementById('statsDatabaseSize').textContent = stats.databaseSize;
+        document.getElementById('statsStorageUsed').textContent = stats.storageUsed;
+        document.getElementById('statsUptime').textContent = stats.uptime;
+    }
+
+    renderCharts(chartData) {
+        // Render user growth chart
+        if (chartData.userGrowth) {
+            this.renderUserGrowthChart(chartData.userGrowth);
+        }
+        
+        // Render message activity chart
+        if (chartData.messageActivity) {
+            this.renderMessageActivityChart(chartData.messageActivity);
+        }
+    }
+
+    renderUserGrowthChart(data) {
+        const ctx = document.getElementById('userGrowthChart').getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (this.userGrowthChart) {
+            this.userGrowthChart.destroy();
+        }
+
+        this.userGrowthChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'New Users',
+                    data: data.data,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            maxTicksLimit: 6,
+                            precision: 0
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
                     }
                 }
-                
-                // Get current super admin details and update the simplified view
-                this.loadCurrentSuperAdminDetails();
-                
-            } else {
-                const statusElement = document.getElementById('superAdminStatus');
-                if (statusElement) {
-                    statusElement.textContent = 'Error';
-                }
             }
-        } catch (error) {
-            console.error('Failed to check super admin status:', error);
-            const statusElement = document.getElementById('superAdminStatus');
-            if (statusElement) {
-                statusElement.textContent = 'Error';
-            }
-        }
+        });
     }
 
-    async loadCurrentSuperAdminDetails() {
-        try {
-            const response = await fetch('/api/admin/users?limit=1000', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                const users = data.users || data;
-                
-                // Find super admin user
-                const superAdmin = users.find(user => 
-                    user.role === 'ADMIN' && (user.isSuperAdmin || user.email === process.env.SUPER_ADMIN_EMAIL)
-                );
-                
-                // Update current super admin email
-                const emailElement = document.getElementById('currentSuperAdminEmail');
-                if (emailElement) {
-                    emailElement.textContent = superAdmin ? superAdmin.email : 'No Super Admin Found';
-                }
-                
-            }
-        } catch (error) {
-            console.error('Error loading super admin details:', error);
-            const emailElement = document.getElementById('currentSuperAdminEmail');
-            if (emailElement) {
-                emailElement.textContent = 'Error loading';
-            }
-        }
-    }
-
-    async syncSuperAdmin() {
-        try {
-            document.getElementById('syncStatus').textContent = 'Syncing...';
-            
-            const response = await fetch('/api/health/sync-super-admin-instant', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                this.showMessage('Super Admin sync completed successfully!', 'success');
-                
-                // Refresh status after sync
-                setTimeout(() => {
-                    this.refreshSuperAdminStatus();
-                }, 1000);
-                
-            } else {
-                const error = await response.json();
-                this.showMessage(`Sync failed: ${error.error || 'Unknown error'}`, 'error');
-                document.getElementById('syncStatus').textContent = 'Sync Failed';
-            }
-        } catch (error) {
-            console.error('Failed to sync super admin:', error);
-            this.showMessage('Sync failed: Network error', 'error');
-            document.getElementById('syncStatus').textContent = 'Sync Failed';
-        }
-    }
-
-    async forceEnvironmentSync() {
-        if (!confirm('This will force synchronization with Railway environment variables. Continue?')) {
-            return;
-        }
+    renderMessageActivityChart(data) {
+        const ctx = document.getElementById('messageActivityChart').getContext('2d');
         
-        try {
-            document.getElementById('syncStatus').textContent = 'Force syncing...';
-            
-            const response = await fetch('/api/health/force-env-sync', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                this.showMessage('Environment sync completed successfully!', 'success');
-                
-                // Refresh status after sync
-                setTimeout(() => {
-                    this.refreshSuperAdminStatus();
-                }, 1000);
-                
-            } else {
-                const error = await response.json();
-                this.showMessage(`Force sync failed: ${error.error || 'Unknown error'}`, 'error');
-                document.getElementById('syncStatus').textContent = 'Force Sync Failed';
-            }
-        } catch (error) {
-            console.error('Failed to force sync:', error);
-            this.showMessage('Force sync failed: Network error', 'error');
-            document.getElementById('syncStatus').textContent = 'Force Sync Failed';
-        }
-    }
-
-    async cleanupDuplicateEmails() {
-        if (!confirm('This will clean up all duplicate email addresses in the database. This action cannot be undone. Continue?')) {
-            return;
-        }
-        
-        try {
-            this.showMessage('Cleaning up duplicate emails...', 'info');
-            
-            const response = await fetch('/api/health/cleanup-duplicates', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                this.showMessage('Duplicate emails cleaned up successfully!', 'success');
-                
-                // Refresh status after cleanup
-                setTimeout(() => {
-                    this.refreshSuperAdminStatus();
-                    this.loadUsers(); // Refresh user list
-                }, 1000);
-                
-            } else {
-                const error = await response.json();
-                this.showMessage(`Cleanup failed: ${error.error || 'Unknown error'}`, 'error');
-            }
-        } catch (error) {
-            console.error('Failed to cleanup duplicates:', error);
-            this.showMessage('Cleanup failed: Network error', 'error');
-        }
-    }
-
-    async forceSyncNow() {
-        try {
-            this.showMessage('Forcing immediate sync...', 'info');
-            
-            const response = await fetch('/api/health/force-sync', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                this.showMessage('Immediate sync completed successfully!', 'success');
-                
-                // Show sync status if available
-                if (data.status && data.status.retryQueueSize > 0) {
-                    this.showMessage(`Sync completed. ${data.status.retryQueueSize} items in retry queue.`, 'warning');
-                }
-                
-                // Refresh status after sync
-                setTimeout(() => {
-                    this.refreshSuperAdminStatus();
-                }, 1000);
-                
-            } else {
-                const error = await response.json();
-                this.showMessage(`Force sync failed: ${error.error || 'Unknown error'}`, 'error');
-            }
-        } catch (error) {
-            console.error('Failed to force sync:', error);
-            this.showMessage('Force sync failed: Network error', 'error');
-        }
-    }
-
-    async getSystemSummary() {
-        try {
-            this.showMessage('Getting system summary...', 'info');
-            
-            const response = await fetch('/api/health/super-admin-summary', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-
-            const summary = await response.json();
-            
-            if (response.ok) {
-                this.displaySystemSummary(summary);
-                this.showMessage('✅ System summary loaded', 'success');
-            } else {
-                this.showMessage(summary.error || 'Failed to get summary', 'error');
-            }
-        } catch (error) {
-            this.showMessage('Error getting system summary', 'error');
-            console.error('Error:', error);
-        }
-    }
-
-    displaySystemSummary(summary) {
-        // Update UI with comprehensive system information
-        if (document.getElementById('currentSuperAdminEmail')) {
-            document.getElementById('currentSuperAdminEmail').textContent = 
-                summary.currentSuperAdmins[0]?.email || 'None';
-        }
-        if (document.getElementById('environmentTargetEmail')) {
-            document.getElementById('environmentTargetEmail').textContent = 
-                summary.environmentEmail || 'Not Set';
-        }
-        if (document.getElementById('syncStatus')) {
-            document.getElementById('syncStatus').textContent = 
-                summary.isInSync ? 'Synchronized' : 'Needs Sync';
-        }
-        if (document.getElementById('systemStatus')) {
-            document.getElementById('systemStatus').textContent = 
-                this.getStatusDescription(summary.systemStatus);
-        }
-        
-        // Show additional details
-        if (summary.currentSuperAdmins.length > 1) {
-            this.showMessage(`⚠️ Found ${summary.currentSuperAdmins.length} super admins. System will consolidate automatically.`, 'warning');
+        // Destroy existing chart if it exists
+        if (this.messageActivityChart) {
+            this.messageActivityChart.destroy();
         }
 
-        // Show what action will be taken
-        if (summary.systemStatus !== 'SYNCHRONIZED') {
-            const actionMessage = this.getActionMessage(summary.systemStatus, summary.environmentEmail);
-            this.showMessage(actionMessage, 'info');
-        }
-    }
-
-    getStatusDescription(status) {
-        const descriptions = {
-            'SYNCHRONIZED': '✅ Perfect',
-            'EMAIL_MISMATCH': '🔄 Will Promote User',
-            'NO_SUPER_ADMIN': '🆕 Will Create/Promote',
-            'MULTIPLE_SUPER_ADMINS': '🧹 Will Cleanup',
-            'ENV_VARS_NOT_SET': '❌ Env Vars Missing'
-        };
-        return descriptions[status] || status;
-    }
-
-    getActionMessage(status, envEmail) {
-        switch (status) {
-            case 'EMAIL_MISMATCH': 
-                return `Will promote existing user "${envEmail}" to super admin`;
-            case 'NO_SUPER_ADMIN': 
-                return `Will create or promote "${envEmail}" as super admin`;
-            case 'MULTIPLE_SUPER_ADMINS': 
-                return 'Will consolidate multiple super admins into one';
-            case 'ENV_VARS_NOT_SET':
-                return 'Set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD environment variables';
-            default: 
-                return 'System will be updated on next sync';
-        }
-    }
-
-    async promoteUserToSuperAdmin() {
-        const email = prompt('Enter email of user to promote to super admin:');
-        
-        if (!email) {
-            this.showMessage('Email is required', 'error');
-            return;
-        }
-
-        if (!confirm(`Are you sure you want to promote "${email}" to super admin? This will demote the current super admin.`)) {
-            return;
-        }
-
-        try {
-            this.showMessage('Promoting user to super admin...', 'info');
-            
-            const response = await fetch('/api/health/promote-user-to-super-admin', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.token}`
+        this.messageActivityChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Messages',
+                    data: data.data,
+                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                    borderColor: 'rgb(16, 185, 129)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            maxTicksLimit: 6,
+                            precision: 0
+                        }
+                    }
                 },
-                body: JSON.stringify({ email })
-            });
-
-            const result = await response.json();
-            
-            if (response.ok) {
-                this.showMessage(`✅ Successfully promoted ${email} to super admin!`, 'success');
-                await this.getSystemSummary();
-                await this.loadUsers(); // Refresh user list
-            } else {
-                this.showMessage(result.error || 'Failed to promote user', 'error');
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
             }
-        } catch (error) {
-            this.showMessage('Error promoting user to super admin', 'error');
-            console.error('Error:', error);
-        }
+        });
     }
 
-    showMessage(message, type = 'info') {
-        // Create or update message element
-        let messageElement = document.getElementById('adminMessage');
-        if (!messageElement) {
-            messageElement = document.createElement('div');
-            messageElement.id = 'adminMessage';
-            messageElement.className = 'fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50';
-            document.body.appendChild(messageElement);
-        }
-        
-        // Set message content and styling
-        messageElement.textContent = message;
-        messageElement.className = 'fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50';
-        
-        switch (type) {
-            case 'success':
-                messageElement.className += ' bg-green-500 text-white';
-                break;
-            case 'error':
-                messageElement.className += ' bg-red-500 text-white';
-                break;
-            case 'warning':
-                messageElement.className += ' bg-yellow-500 text-white';
-                break;
-            default:
-                messageElement.className += ' bg-blue-500 text-white';
-        }
-        
-        // Auto-hide after 3 seconds
-        setTimeout(() => {
-            if (messageElement && messageElement.parentNode) {
-                messageElement.parentNode.removeChild(messageElement);
+    async exportStatistics() {
+        try {
+            const response = await fetch('/api/admin/export/statistics', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `statistics_report_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                alert('Failed to export statistics');
             }
-        }, 3000);
+        } catch (error) {
+            alert('Failed to export statistics');
+        }
     }
 }
 
