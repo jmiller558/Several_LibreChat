@@ -659,8 +659,35 @@ class AdminPortal {
     }
 
     loadStatistics() {
-        // Load placeholder statistics for now
-        this.loadPlaceholderStatistics();
+        // Try to load real statistics first, fallback to placeholder if needed
+        this.loadRealStatistics();
+    }
+
+    async loadRealStatistics() {
+        try {
+            console.log('Attempting to load real statistics...');
+            const response = await fetch('/api/admin/statistics', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                },
+            });
+
+            if (response.ok) {
+                const stats = await response.json();
+                console.log('Real statistics loaded successfully:', stats);
+                this.renderRealStatistics(stats);
+                this.renderRealCharts(stats);
+            } else {
+                console.warn('Failed to load real statistics, status:', response.status);
+                const errorText = await response.text();
+                console.warn('Error response:', errorText);
+                this.loadPlaceholderStatistics();
+            }
+        } catch (error) {
+            console.error('Error loading real statistics:', error);
+            console.warn('Using placeholder data as fallback');
+            this.loadPlaceholderStatistics();
+        }
     }
 
     loadPlaceholderStatistics() {
@@ -731,43 +758,119 @@ class AdminPortal {
         };
     }
 
-    renderStatistics(stats) {
+    renderRealStatistics(stats) {
         // Update overview metrics
-        document.getElementById('statsTotalUsers').textContent = stats.overview.totalUsers.toLocaleString();
-        document.getElementById('statsTotalMessages').textContent = stats.overview.totalMessages.toLocaleString();
-        document.getElementById('statsTotalConversations').textContent = stats.overview.totalConversations.toLocaleString();
-        document.getElementById('statsActiveUsers').textContent = stats.overview.activeUsers.toLocaleString();
+        document.getElementById('statsTotalUsers').textContent = stats.users?.total?.toLocaleString() || '0';
+        document.getElementById('statsTotalMessages').textContent = stats.messages?.total?.toLocaleString() || '0';
+        document.getElementById('statsTotalConversations').textContent = stats.conversations?.total?.toLocaleString() || '0';
+        document.getElementById('statsActiveUsers').textContent = stats.users?.active?.toLocaleString() || '0';
 
-        // Update growth percentages
-        document.getElementById('statsUserGrowth').textContent = stats.growth.userGrowth;
-        document.getElementById('statsMessageGrowth').textContent = stats.growth.messageGrowth;
-        document.getElementById('statsConversationGrowth').textContent = stats.growth.conversationGrowth;
-        document.getElementById('statsActiveGrowth').textContent = stats.growth.activeGrowth;
+        // Update growth percentages (calculate from data if available)
+        document.getElementById('statsUserGrowth').textContent = stats.growth?.users || '0';
+        document.getElementById('statsMessageGrowth').textContent = stats.growth?.messages || '0';
+        document.getElementById('statsConversationGrowth').textContent = stats.growth?.conversations || '0';
+        document.getElementById('statsActiveGrowth').textContent = stats.growth?.active || '0';
 
         // Update user statistics
-        document.getElementById('statsRegisteredUsers').textContent = stats.users.registered.toLocaleString();
-        document.getElementById('statsVerifiedUsers').textContent = stats.users.verified.toLocaleString();
-        document.getElementById('statsAdminUsers').textContent = stats.users.admin.toLocaleString();
-        document.getElementById('statsBannedUsers').textContent = stats.users.banned.toLocaleString();
-        document.getElementById('stats2FAUsers').textContent = stats.users.twoFactor.toLocaleString();
-        document.getElementById('statsRecentLogins').textContent = stats.users.recentLogins.toLocaleString();
+        document.getElementById('statsRegisteredUsers').textContent = stats.users?.total?.toLocaleString() || '0';
+        document.getElementById('statsVerifiedUsers').textContent = stats.users?.verified?.toLocaleString() || '0';
+        document.getElementById('statsAdminUsers').textContent = stats.users?.admin?.toLocaleString() || '0';
+        document.getElementById('statsBannedUsers').textContent = stats.users?.banned?.toLocaleString() || '0';
+        document.getElementById('stats2FAUsers').textContent = stats.users?.twoFactor?.toLocaleString() || '0';
+        document.getElementById('statsRecentLogins').textContent = stats.activity?.recentLogins?.toLocaleString() || '0';
 
         // Update performance metrics
-        document.getElementById('statsAvgMessages').textContent = stats.performance.avgMessagesPerUser;
-        document.getElementById('statsAvgConversations').textContent = stats.performance.avgConversationsPerUser;
-        document.getElementById('statsPeakHour').textContent = stats.performance.peakHour;
-        document.getElementById('statsDatabaseSize').textContent = stats.performance.databaseSize;
-        document.getElementById('statsStorageUsed').textContent = stats.performance.storageUsed;
+        document.getElementById('statsAvgMessages').textContent = stats.performance?.avgMessagesPerUser || '0';
+        document.getElementById('statsAvgConversations').textContent = stats.performance?.avgConversationsPerUser || '0';
+        document.getElementById('statsPeakHour').textContent = stats.performance?.peakHour || 'N/A';
+        document.getElementById('statsDatabaseSize').textContent = stats.system?.databaseSize || 'N/A';
+        document.getElementById('statsStorageUsed').textContent = stats.system?.storageUsed || 'N/A';
         
         // Format uptime
-        const uptime = stats.performance.uptime;
-        const days = Math.floor(uptime / 86400);
-        const hours = Math.floor((uptime % 86400) / 3600);
-        const minutes = Math.floor((uptime % 3600) / 60);
-        document.getElementById('statsUptime').textContent = `${days}d ${hours}h ${minutes}m`;
+        if (stats.system?.uptime) {
+            const uptime = stats.system.uptime;
+            const days = Math.floor(uptime / 86400);
+            const hours = Math.floor((uptime % 86400) / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            document.getElementById('statsUptime').textContent = `${days}d ${hours}h ${minutes}m`;
+        } else {
+            document.getElementById('statsUptime').textContent = 'N/A';
+        }
 
         // Update last updated time
-        document.getElementById('statsLastUpdated').textContent = new Date(stats.lastUpdated).toLocaleString();
+        document.getElementById('statsLastUpdated').textContent = new Date(stats.lastUpdated || Date.now()).toLocaleString();
+    }
+
+    renderRealCharts(stats) {
+        // Use real chart data if available, otherwise generate placeholder
+        let chartData;
+        
+        if (stats.charts && stats.charts.userGrowth && stats.charts.messageActivity) {
+            chartData = {
+                userGrowth: stats.charts.userGrowth.map(item => ({
+                    date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    count: item.count
+                })),
+                messageActivity: stats.charts.messageActivity.map(item => ({
+                    date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    count: item.count
+                }))
+            };
+        } else {
+            // Generate placeholder chart data if real data not available
+            chartData = this.generatePlaceholderChartData();
+        }
+        
+        this.renderCharts(chartData);
+    }
+
+    renderStatistics(stats) {
+        // Handle both old and new data structure formats
+        const overview = stats.overview || stats;
+        const growth = stats.growth || {};
+        const users = stats.users || {};
+        const performance = stats.performance || {};
+
+        // Update overview metrics
+        document.getElementById('statsTotalUsers').textContent = (overview.totalUsers || users.total || 0).toLocaleString();
+        document.getElementById('statsTotalMessages').textContent = (overview.totalMessages || stats.messages?.total || 0).toLocaleString();
+        document.getElementById('statsTotalConversations').textContent = (overview.totalConversations || stats.conversations?.total || 0).toLocaleString();
+        document.getElementById('statsActiveUsers').textContent = (overview.activeUsers || users.active || 0).toLocaleString();
+
+        // Update growth percentages
+        document.getElementById('statsUserGrowth').textContent = growth.userGrowth || '0';
+        document.getElementById('statsMessageGrowth').textContent = growth.messageGrowth || '0';
+        document.getElementById('statsConversationGrowth').textContent = growth.conversationGrowth || '0';
+        document.getElementById('statsActiveGrowth').textContent = growth.activeGrowth || '0';
+
+        // Update user statistics
+        document.getElementById('statsRegisteredUsers').textContent = (users.registered || users.total || 0).toLocaleString();
+        document.getElementById('statsVerifiedUsers').textContent = (users.verified || 0).toLocaleString();
+        document.getElementById('statsAdminUsers').textContent = (users.admin || 0).toLocaleString();
+        document.getElementById('statsBannedUsers').textContent = (users.banned || 0).toLocaleString();
+        document.getElementById('stats2FAUsers').textContent = (users.twoFactor || 0).toLocaleString();
+        document.getElementById('statsRecentLogins').textContent = (users.recentLogins || stats.activity?.recentLogins || 0).toLocaleString();
+
+        // Update performance metrics
+        document.getElementById('statsAvgMessages').textContent = performance.avgMessagesPerUser || '0';
+        document.getElementById('statsAvgConversations').textContent = performance.avgConversationsPerUser || '0';
+        document.getElementById('statsPeakHour').textContent = performance.peakHour || 'N/A';
+        document.getElementById('statsDatabaseSize').textContent = performance.databaseSize || stats.system?.databaseSize || 'N/A';
+        document.getElementById('statsStorageUsed').textContent = performance.storageUsed || stats.system?.storageUsed || 'N/A';
+        
+        // Format uptime
+        const uptime = performance.uptime || stats.system?.uptime;
+        if (uptime) {
+            const days = Math.floor(uptime / 86400);
+            const hours = Math.floor((uptime % 86400) / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            document.getElementById('statsUptime').textContent = `${days}d ${hours}h ${minutes}m`;
+        } else {
+            document.getElementById('statsUptime').textContent = 'N/A';
+        }
+
+        // Update last updated time
+        document.getElementById('statsLastUpdated').textContent = new Date(stats.lastUpdated || Date.now()).toLocaleString();
     }
 
     renderCharts(chartData) {
