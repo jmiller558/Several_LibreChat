@@ -853,6 +853,12 @@ class AdminPortal {
                 // Update security-specific stats
                 document.getElementById('bannedUsers').textContent = data.statistics.users.banned || 0;
                 document.getElementById('adminCount').textContent = data.statistics.users.admin || 0;
+                
+                // Update total admin count in the new simplified section
+                const totalAdminElement = document.getElementById('totalAdminCount');
+                if (totalAdminElement) {
+                    totalAdminElement.textContent = data.statistics.users.admin || 0;
+                }
             }
         } catch (error) {
             console.error('Error loading security stats:', error);
@@ -861,9 +867,6 @@ class AdminPortal {
 
     async refreshSuperAdminStatus() {
         try {
-            // Update status indicators
-            document.getElementById('syncStatus').textContent = 'Checking...';
-            
             const response = await fetch('/api/health/super-admin-status', {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
@@ -873,27 +876,66 @@ class AdminPortal {
             if (response.ok) {
                 const data = await response.json();
                 
-                // Update super admin status
+                // Update super admin status card
                 const statusElement = document.getElementById('superAdminStatus');
-                if (data.superAdminExists) {
-                    statusElement.textContent = '✅ Active';
-                    statusElement.className = 'text-sm text-green-600';
-                } else {
-                    statusElement.textContent = '❌ Not Found';
-                    statusElement.className = 'text-sm text-red-600';
+                if (statusElement) {
+                    if (data.superAdminExists) {
+                        statusElement.textContent = 'Active';
+                        statusElement.className = 'text-lg font-bold text-red-900';
+                    } else {
+                        statusElement.textContent = 'Not Found';
+                        statusElement.className = 'text-lg font-bold text-red-900';
+                    }
                 }
                 
-                // Update sync status
-                document.getElementById('syncStatus').textContent = data.syncEnabled ? '🟢 Enabled' : '🔴 Disabled';
+                // Get current super admin details and update the simplified view
+                this.loadCurrentSuperAdminDetails();
                 
             } else {
-                document.getElementById('superAdminStatus').textContent = 'Error checking status';
-                document.getElementById('syncStatus').textContent = 'Error';
+                const statusElement = document.getElementById('superAdminStatus');
+                if (statusElement) {
+                    statusElement.textContent = 'Error';
+                }
             }
         } catch (error) {
             console.error('Failed to check super admin status:', error);
-            document.getElementById('superAdminStatus').textContent = 'Error';
-            document.getElementById('syncStatus').textContent = 'Error';
+            const statusElement = document.getElementById('superAdminStatus');
+            if (statusElement) {
+                statusElement.textContent = 'Error';
+            }
+        }
+    }
+
+    async loadCurrentSuperAdminDetails() {
+        try {
+            const response = await fetch('/api/admin/users?limit=1000', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const users = data.users || data;
+                
+                // Find super admin user
+                const superAdmin = users.find(user => 
+                    user.role === 'ADMIN' && (user.isSuperAdmin || user.email === process.env.SUPER_ADMIN_EMAIL)
+                );
+                
+                // Update current super admin email
+                const emailElement = document.getElementById('currentSuperAdminEmail');
+                if (emailElement) {
+                    emailElement.textContent = superAdmin ? superAdmin.email : 'No Super Admin Found';
+                }
+                
+            }
+        } catch (error) {
+            console.error('Error loading super admin details:', error);
+            const emailElement = document.getElementById('currentSuperAdminEmail');
+            if (emailElement) {
+                emailElement.textContent = 'Error loading';
+            }
         }
     }
 
