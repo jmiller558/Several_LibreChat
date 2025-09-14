@@ -420,15 +420,25 @@
                     <!-- Charts and Detailed Analytics -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         <!-- User Growth Chart -->
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <h3 class="text-lg font-semibold mb-4">User Growth (Last 30 Days)</h3>
-                            <canvas id="userGrowthChart" width="400" height="200"></canvas>
+                        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-lg font-semibold text-gray-800">User Growth</h3>
+                                <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">Last 7 Days</span>
+                            </div>
+                            <div class="relative h-64">
+                                <canvas id="userGrowthChart"></canvas>
+                            </div>
                         </div>
                         
                         <!-- Message Activity Chart -->
-                        <div class="bg-white p-6 rounded-lg shadow">
-                            <h3 class="text-lg font-semibold mb-4">Message Activity (Last 7 Days)</h3>
-                            <canvas id="messageActivityChart" width="400" height="200"></canvas>
+                        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-lg font-semibold text-gray-800">Message Activity</h3>
+                                <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">Last 7 Days</span>
+                            </div>
+                            <div class="relative h-64">
+                                <canvas id="messageActivityChart"></canvas>
+                            </div>
                         </div>
                     </div>
 

@@ -659,27 +659,76 @@ class AdminPortal {
     }
 
     loadStatistics() {
-        this.loadDetailedStatistics();
+        // Load placeholder statistics for now
+        this.loadPlaceholderStatistics();
     }
 
-    async loadDetailedStatistics() {
-        try {
-            const response = await fetch('/api/admin/statistics', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
+    loadPlaceholderStatistics() {
+        // Generate placeholder data
+        const placeholderStats = {
+            overview: {
+                totalUsers: 1247,
+                totalMessages: 24873,
+                totalConversations: 5892,
+                activeUsers: 324
+            },
+            growth: {
+                userGrowth: 12.5,
+                messageGrowth: 18.3,
+                conversationGrowth: 9.7,
+                activeGrowth: 5.2
+            },
+            users: {
+                registered: 1247,
+                verified: 1089,
+                admin: 3,
+                banned: 12,
+                twoFactor: 234,
+                recentLogins: 89
+            },
+            performance: {
+                avgMessagesPerUser: 19.9,
+                avgConversationsPerUser: 4.7,
+                peakHour: '2:00 PM',
+                databaseSize: '2.4 GB',
+                storageUsed: '1.8 GB',
+                uptime: 432000 // 5 days in seconds
+            },
+            lastUpdated: new Date().toISOString()
+        };
 
-            if (response.ok) {
-                const stats = await response.json();
-                this.renderStatistics(stats);
-                this.renderCharts(stats.charts);
-            } else {
-                console.error('Failed to load statistics');
-            }
-        } catch (error) {
-            console.error('Error loading statistics:', error);
+        // Generate chart data
+        const chartData = this.generatePlaceholderChartData();
+        
+        this.renderStatistics(placeholderStats);
+        this.renderCharts(chartData);
+    }
+
+    generatePlaceholderChartData() {
+        const today = new Date();
+        const userGrowthData = [];
+        const messageActivityData = [];
+
+        // Generate 7 days of data
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            
+            userGrowthData.push({
+                date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                count: Math.floor(Math.random() * 15) + 5 // 5-20 new users per day
+            });
+            
+            messageActivityData.push({
+                date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                count: Math.floor(Math.random() * 50) + 20 // 20-70 messages per day
+            });
         }
+
+        return {
+            userGrowth: userGrowthData,
+            messageActivity: messageActivityData
+        };
     }
 
     renderStatistics(stats) {
@@ -737,27 +786,75 @@ class AdminPortal {
                 datasets: [{
                     label: 'New Users',
                     data: chartData.userGrowth.map(item => item.count),
-                    borderColor: 'rgb(59, 130, 246)',
+                    borderColor: '#3B82F6',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.1,
-                    fill: true
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#3B82F6',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            maxTicksLimit: 6,
-                            precision: 0
-                        }
-                    }
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
                 },
                 plugins: {
                     legend: {
-                        display: false
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#374151',
+                            font: {
+                                size: 14,
+                                weight: '500'
+                            },
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        titleColor: '#374151',
+                        bodyColor: '#6B7280',
+                        borderColor: '#E5E7EB',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        displayColors: false
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: true,
+                            color: 'rgba(229, 231, 235, 0.5)'
+                        },
+                        ticks: {
+                            color: '#6B7280',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            color: 'rgba(229, 231, 235, 0.5)'
+                        },
+                        ticks: {
+                            maxTicksLimit: 6,
+                            precision: 0,
+                            color: '#6B7280',
+                            font: {
+                                size: 12
+                            }
+                        }
                     }
                 }
             }
@@ -779,25 +876,68 @@ class AdminPortal {
                     label: 'Messages',
                     data: chartData.messageActivity.map(item => item.count),
                     backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                    borderColor: 'rgb(16, 185, 129)',
-                    borderWidth: 1
+                    borderColor: '#10B981',
+                    borderWidth: 0,
+                    borderRadius: 6,
+                    borderSkipped: false
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            maxTicksLimit: 6,
-                            precision: 0
-                        }
-                    }
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
                 },
                 plugins: {
                     legend: {
-                        display: false
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#374151',
+                            font: {
+                                size: 14,
+                                weight: '500'
+                            },
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        titleColor: '#374151',
+                        bodyColor: '#6B7280',
+                        borderColor: '#E5E7EB',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        displayColors: false
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#6B7280',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            display: true,
+                            color: 'rgba(229, 231, 235, 0.5)'
+                        },
+                        ticks: {
+                            maxTicksLimit: 6,
+                            precision: 0,
+                            color: '#6B7280',
+                            font: {
+                                size: 12
+                            }
+                        }
                     }
                 }
             }
