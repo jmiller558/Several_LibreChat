@@ -275,9 +275,6 @@ class AdminPortal {
             case 'statistics':
                 this.loadStatistics();
                 break;
-            case 'database':
-                this.loadDatabase();
-                break;
         }
     }
 
@@ -865,39 +862,6 @@ class AdminPortal {
             }
         } catch (error) {
             alert('Failed to export statistics');
-        }
-    }
-
-    async loadDatabase() {
-        try {
-            const response = await fetch('/api/admin/database/info', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                document.getElementById('databaseInfo').innerHTML = `
-                    <h3 class="text-lg font-semibold mb-4">Database Information</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <h4 class="font-medium">Database Stats</h4>
-                            <p>Data Size: ${(data.database.dataSize / 1024 / 1024).toFixed(2)} MB</p>
-                            <p>Index Size: ${(data.database.indexSize / 1024 / 1024).toFixed(2)} MB</p>
-                            <p>Objects: ${data.database.objects}</p>
-                        </div>
-                        <div>
-                            <h4 class="font-medium">Collections</h4>
-                            <ul class="list-disc list-inside">
-                                ${data.collections.map(col => `<li>${col}</li>`).join('')}
-                            </ul>
-                        </div>
-                    </div>
-                `;
-            }
-        } catch (error) {
-            console.error('Failed to load database info:', error);
         }
     }
 
