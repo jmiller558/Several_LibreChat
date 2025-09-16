@@ -712,31 +712,6 @@ class AdminPortal {
                 this.updateElement('statsActiveUsers', stats.overview.activeUsers?.toLocaleString() || '0');
             }
 
-            // Update detailed user statistics (for other sections if they exist)
-            if (stats.users) {
-                this.updateElement('statsRegisteredUsers', stats.users.registered?.toLocaleString() || '0');
-                this.updateElement('statsVerifiedUsers', stats.users.verified?.toLocaleString() || '0');
-                this.updateElement('statsAdminUsers', (stats.users.admin + stats.users.superAdmin || 0).toLocaleString());
-                this.updateElement('statsBannedUsers', stats.users.banned?.toLocaleString() || '0');
-                this.updateElement('stats2FAUsers', stats.users.twoFactor?.toLocaleString() || '0');
-                this.updateElement('statsRecentLogins', stats.users.recentLogins?.toLocaleString() || '0');
-            }
-
-            // Update performance metrics (for other sections if they exist)
-            if (stats.performance) {
-                this.updateElement('statsAvgMessages', stats.performance.avgMessagesPerUser || '0');
-                this.updateElement('statsAvgConversations', stats.performance.avgConversationsPerUser || '0');
-                this.updateElement('statsPeakHour', stats.performance.peakHour || 'N/A');
-                this.updateElement('statsDatabaseSize', stats.performance.databaseSize || 'N/A');
-                this.updateElement('statsStorageUsed', stats.performance.storageUsed || 'N/A');
-                
-                // Format uptime from seconds to readable format
-                if (stats.performance.uptime) {
-                    const uptime = this.formatUptime(stats.performance.uptime);
-                    this.updateElement('statsUptime', uptime);
-                }
-            }
-
             // Update last updated timestamp
             if (stats.lastUpdated) {
                 const lastUpdated = new Date(stats.lastUpdated).toLocaleString();
@@ -883,38 +858,6 @@ class AdminPortal {
         document.getElementById('statsTotalMessages').textContent = stats.overview?.totalMessages?.toLocaleString() || '0';
         document.getElementById('statsTotalConversations').textContent = stats.overview?.totalConversations?.toLocaleString() || '0';
         document.getElementById('statsActiveUsers').textContent = stats.overview?.activeUsers?.toLocaleString() || '0';
-
-        // Update growth percentages (calculate from data if available)
-        document.getElementById('statsUserGrowth').textContent = stats.growth?.userGrowth || '0';
-        document.getElementById('statsMessageGrowth').textContent = stats.growth?.messageGrowth || '0';
-        document.getElementById('statsConversationGrowth').textContent = stats.growth?.conversationGrowth || '0';
-        document.getElementById('statsActiveGrowth').textContent = stats.growth?.activeGrowth || '0';
-
-        // Update user statistics
-        document.getElementById('statsRegisteredUsers').textContent = stats.users?.registered?.toLocaleString() || '0';
-        document.getElementById('statsVerifiedUsers').textContent = stats.users?.verified?.toLocaleString() || '0';
-        document.getElementById('statsAdminUsers').textContent = stats.users?.admin?.toLocaleString() || '0';
-        document.getElementById('statsBannedUsers').textContent = stats.users?.banned?.toLocaleString() || '0';
-        document.getElementById('stats2FAUsers').textContent = stats.users?.twoFactor?.toLocaleString() || '0';
-        document.getElementById('statsRecentLogins').textContent = stats.users?.recentLogins?.toLocaleString() || '0';
-
-        // Update performance metrics
-        document.getElementById('statsAvgMessages').textContent = stats.performance?.avgMessagesPerUser || '0';
-        document.getElementById('statsAvgConversations').textContent = stats.performance?.avgConversationsPerUser || '0';
-        document.getElementById('statsPeakHour').textContent = stats.performance?.peakHour || 'N/A';
-        document.getElementById('statsDatabaseSize').textContent = stats.performance?.databaseSize || 'N/A';
-        document.getElementById('statsStorageUsed').textContent = stats.performance?.storageUsed || 'N/A';
-        
-        // Format uptime
-        if (stats.performance?.uptime) {
-            const uptime = stats.performance.uptime;
-            const days = Math.floor(uptime / 86400);
-            const hours = Math.floor((uptime % 86400) / 3600);
-            const minutes = Math.floor((uptime % 3600) / 60);
-            document.getElementById('statsUptime').textContent = `${days}d ${hours}h ${minutes}m`;
-        } else {
-            document.getElementById('statsUptime').textContent = 'N/A';
-        }
 
         // Update last updated time
         document.getElementById('statsLastUpdated').textContent = new Date(stats.lastUpdated || Date.now()).toLocaleString();
