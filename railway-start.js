@@ -4,7 +4,7 @@ const path = require('path');
 console.log('🚀 Starting LibreChat with Railway deployment...');
 
 // Determine if admin portal should be started
-const startAdmin = process.env.START_ADMIN_PORTAL === 'true' || process.env.ADMIN_ENABLED === 'true';
+const startAdmin = process.env.ADMIN_ENABLED === 'true';
 
 // Start LibreChat main service
 console.log('🎯 Starting LibreChat main application...');

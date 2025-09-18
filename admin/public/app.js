@@ -4,7 +4,106 @@ class AdminPortal {
         this.currentPage = 1;
         this.selectedUsers = new Set();
         this.currentUser = null; // Store current user info for permission checks
+        this.baseURL = '/api/admin';
+        this.currentSearch = '';
         this.init();
+    }
+
+    /**
+     * Reusable API request handler
+     * @param {string} endpoint - API endpoint (without base URL)
+     * @param {Object} options - Request options
+     * @returns {Promise<any>} - Response data
+     */
+    async apiRequest(endpoint, options = {}) {
+        const config = {
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            ...options
+        };
+
+        try {
+            const response = await fetch(`${this.baseURL}${endpoint}`, config);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error(`API request failed for ${endpoint}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Reusable DOM element updater
+     * @param {string} elementId - Element ID to update
+     * @param {string|number} value - Value to set
+     * @param {string} property - Property to update (textContent, innerHTML, value)
+     */
+    updateElement(elementId, value, property = 'textContent') {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element[property] = value;
+        } else {
+            console.warn(`Element with ID '${elementId}' not found`);
+        }
+    }
+
+    /**
+     * Reusable modal handler
+     * @param {string} modalId - Modal element ID
+     * @param {boolean} show - Whether to show or hide modal
+     */
+    toggleModal(modalId, show = true) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = show ? 'block' : 'none';
+        }
+    }
+
+    /**
+     * Reusable error handler
+     * @param {Error} error - Error object
+     * @param {string} context - Context where error occurred
+     */
+    handleError(error, context) {
+        console.error(`Error in ${context}:`, error);
+        // Add more error handling logic here if needed
+    }
+
+    /**
+     * Safely add event listener to element if it exists
+     * @param {string} elementId - Element ID
+     * @param {string} event - Event type
+     * @param {Function} handler - Event handler
+     */
+    addEventListenerSafe(elementId, event, handler) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.addEventListener(event, handler);
+        }
+    }
+
+    /**
+     * Debounce function for search and other frequent operations
+     * @param {Function} func - Function to debounce
+     * @param {number} wait - Wait time in milliseconds
+     */
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
     }
 
     init() {
@@ -20,13 +119,13 @@ class AdminPortal {
 
     setupEventListeners() {
         // Login form
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
+        this.addEventListenerSafe('loginForm', 'submit', (e) => {
             e.preventDefault();
             this.login();
         });
 
         // Logout button
-        document.getElementById('logoutBtn').addEventListener('click', () => {
+        this.addEventListenerSafe('logoutBtn', 'click', () => {
             this.logout();
         });
 
@@ -39,106 +138,167 @@ class AdminPortal {
             });
         });
 
-        // User search and filter
-        document.getElementById('userSearch').addEventListener('input', () => {
+        // User search and filter with debouncing
+        this.addEventListenerSafe('userSearch', 'input', 
+            this.debounce(() => this.loadUsers(), 300)
+        );
+
+        this.addEventListenerSafe('roleFilter', 'change', () => {
             this.loadUsers();
         });
 
-        document.getElementById('roleFilter').addEventListener('change', () => {
-            this.loadUsers();
-        });
-
-        document.getElementById('statusFilter').addEventListener('change', () => {
+        this.addEventListenerSafe('statusFilter', 'change', () => {
             this.loadUsers();
         });
 
         // Export users
-        document.getElementById('exportUsers').addEventListener('click', () => {
+        this.addEventListenerSafe('exportUsers', 'click', () => {
             this.exportUsers();
         });
 
         // Add User modal controls
-        document.getElementById('addUserBtn').addEventListener('click', () => {
+        this.addEventListenerSafe('addUserBtn', 'click', () => {
             this.showAddUserModal();
         });
 
-        document.getElementById('closeAddUserModal').addEventListener('click', () => {
+        this.addEventListenerSafe('closeAddUserModal', 'click', () => {
             this.hideAddUserModal();
         });
 
-        document.getElementById('cancelAddUser').addEventListener('click', () => {
+        this.addEventListenerSafe('cancelAddUser', 'click', () => {
             this.hideAddUserModal();
         });
 
         // Add User form submission
-        document.getElementById('addUserForm').addEventListener('submit', (e) => {
+        this.addEventListenerSafe('addUserForm', 'submit', (e) => {
             e.preventDefault();
-            this.createUser();
+            this.handleUserFormSubmit(e);
         });
 
         // Statistics controls
-        document.getElementById('refreshStats').addEventListener('click', () => {
-            this.loadStatistics();
+        this.addEventListenerSafe('refreshStats', 'click', () => {
+            this.refreshData();
         });
 
-        document.getElementById('exportStats').addEventListener('click', () => {
+        this.addEventListenerSafe('exportStats', 'click', () => {
             this.exportStatistics();
         });
 
         // Pagination
-        document.getElementById('prevPage').addEventListener('click', () => {
+        this.addEventListenerSafe('prevPage', 'click', () => {
             if (this.currentPage > 1) {
                 this.currentPage--;
                 this.loadUsers();
             }
         });
 
-        document.getElementById('nextPage').addEventListener('click', () => {
+        this.addEventListenerSafe('nextPage', 'click', () => {
             this.currentPage++;
             this.loadUsers();
         });
+    }
 
-        // Super Admin event listeners
-        if (document.getElementById('syncSuperAdminBtn')) {
-            document.getElementById('syncSuperAdminBtn').addEventListener('click', () => {
-                this.syncSuperAdmin();
-            });
+    /**
+     * Handle user form submission with unified logic
+     * @param {Event} e - Form submit event
+     */
+    async handleUserFormSubmit(e) {
+        e.preventDefault();
+        
+        const formData = this.extractFormData(e.target);
+        const userId = formData.userId;
+        
+        // Remove userId from form data as it's not part of user data
+        delete formData.userId;
+        
+        if (userId) {
+            await this.updateUser(userId, formData);
+        } else {
+            await this.createUser(formData);
         }
+    }
 
-        if (document.getElementById('forceSyncBtn')) {
-            document.getElementById('forceSyncBtn').addEventListener('click', () => {
-                this.forceEnvironmentSync();
-            });
+    /**
+     * Extract form data into object
+     * @param {HTMLFormElement} form - Form element
+     * @returns {Object} - Form data as object
+     */
+    extractFormData(form) {
+        const formData = new FormData(form);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            // Handle checkboxes and special cases
+            if (form.elements[key] && form.elements[key].type === 'checkbox') {
+                data[key] = form.elements[key].checked;
+            } else {
+                data[key] = value;
+            }
         }
+        
+        return data;
+    }
 
-        if (document.getElementById('cleanupDuplicatesBtn')) {
-            document.getElementById('cleanupDuplicatesBtn').addEventListener('click', () => {
-                this.cleanupDuplicateEmails();
-            });
+    /**
+     * Populate form with user data
+     * @param {HTMLFormElement} form - Form element
+     * @param {Object} data - Data to populate
+     */
+    populateForm(form, data) {
+        Object.entries(data).forEach(([key, value]) => {
+            const field = form.elements[key];
+            if (field) {
+                if (field.type === 'checkbox') {
+                    field.checked = value;
+                } else {
+                    field.value = value;
+                }
+            }
+        });
+    }
+
+    /**
+     * Refresh all data with error handling
+     */
+    async refreshData() {
+        console.log('🔄 Refreshing all data...');
+        
+        const refreshTasks = [
+            { name: 'statistics', task: () => this.loadDetailedStatistics() },
+            { name: 'users', task: () => this.loadUsers() },
+            { name: 'security', task: () => this.loadSecurityData() }
+        ];
+        
+        await this.executeTasksWithFallback(refreshTasks);
+    }
+
+    /**
+     * Execute multiple tasks with individual error handling
+     * @param {Array} tasks - Array of {name, task} objects
+     */
+    async executeTasksWithFallback(tasks) {
+        const results = await Promise.allSettled(
+            tasks.map(({ name, task }) => 
+                task().catch(error => {
+                    this.handleError(error, `refresh-${name}`);
+                    return null;
+                })
+            )
+        );
+        
+        const failed = results.filter(result => result.status === 'rejected');
+        if (failed.length > 0) {
+            console.warn(`${failed.length} refresh tasks failed`);
         }
+    }
 
-        if (document.getElementById('forceSyncNowBtn')) {
-            document.getElementById('forceSyncNowBtn').addEventListener('click', () => {
-                this.forceSyncNow();
-            });
-        }
-
-        if (document.getElementById('refreshStatusBtn')) {
-            document.getElementById('refreshStatusBtn').addEventListener('click', () => {
-                this.refreshSuperAdminStatus();
-            });
-        }
-
-        if (document.getElementById('getSystemSummaryBtn')) {
-            document.getElementById('getSystemSummaryBtn').addEventListener('click', () => {
-                this.getSystemSummary();
-            });
-        }
-
-        if (document.getElementById('promoteUserBtn')) {
-            document.getElementById('promoteUserBtn').addEventListener('click', () => {
-                this.promoteUserToSuperAdmin();
-            });
+    async loadSecurityData() {
+        try {
+            const data = await this.apiRequest('/security');
+            this.updateElement('bannedUsers', data.stats?.bannedUsers || 0);
+            this.updateElement('adminCount', data.stats?.adminUsers || 0);
+        } catch (error) {
+            this.handleError(error, 'loadSecurityData');
         }
     }
 
@@ -270,42 +430,34 @@ class AdminPortal {
                 this.loadUsers();
                 break;
             case 'statistics':
-                this.loadStatistics();
+                this.loadDetailedStatistics();
                 break;
         }
     }
 
     async loadDashboard() {
         try {
-            const response = await fetch('/api/admin/stats', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const stats = await response.json();
-                
-                // Update overview stats
-                document.getElementById('totalUsers').textContent = stats.overview.totalUsers || 0;
-                document.getElementById('activeUsers').textContent = stats.overview.activeUsers || 0;
-                document.getElementById('totalConversations').textContent = stats.overview.totalConversations || 0;
-                document.getElementById('totalMessages').textContent = stats.overview.totalMessages || 0;
-                
-                // Update growth stats
-                document.getElementById('newUsersToday').textContent = stats.userGrowth.today || 0;
-                document.getElementById('newUsersWeek').textContent = stats.userGrowth.thisWeek || 0;
-                document.getElementById('newUsersMonth').textContent = stats.userGrowth.thisMonth || 0;
-            }
+            const stats = await this.apiRequest('/stats');
+            
+            // Update overview stats using reusable method
+            this.updateElement('totalUsers', stats.overview?.totalUsers || 0);
+            this.updateElement('activeUsers', stats.overview?.activeUsers || 0);
+            this.updateElement('totalConversations', stats.overview?.totalConversations || 0);
+            this.updateElement('totalMessages', stats.overview?.totalMessages || 0);
+            
+            // Update growth stats
+            this.updateElement('newUsersToday', stats.userGrowth?.today || 0);
+            this.updateElement('newUsersWeek', stats.userGrowth?.thisWeek || 0);
+            this.updateElement('newUsersMonth', stats.userGrowth?.thisMonth || 0);
         } catch (error) {
-            console.error('Failed to load dashboard stats:', error);
+            this.handleError(error, 'loadDashboard');
         }
     }
 
     async loadUsers() {
-        const search = document.getElementById('userSearch').value;
-        const role = document.getElementById('roleFilter').value;
-        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('userSearch')?.value || '';
+        const role = document.getElementById('roleFilter')?.value || '';
+        const status = document.getElementById('statusFilter')?.value || '';
         
         try {
             const params = new URLSearchParams({
@@ -315,19 +467,11 @@ class AdminPortal {
                 status,
             });
 
-            const response = await fetch(`/api/admin/users?${params}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                this.renderUsers(data.users);
-                this.renderPagination(data.pagination);
-            }
+            const data = await this.apiRequest(`/users?${params}`);
+            this.renderUsers(data.users);
+            this.renderPagination(data.pagination);
         } catch (error) {
-            console.error('Failed to load users:', error);
+            this.handleError(error, 'loadUsers');
         }
     }
 
@@ -562,7 +706,7 @@ class AdminPortal {
     // Export Users
     async exportUsers() {
         try {
-            const response = await fetch('/api/admin/users/export', {
+            const response = await fetch(`${this.baseURL}/users/export`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
                 },
@@ -582,6 +726,7 @@ class AdminPortal {
                 alert('Failed to export users');
             }
         } catch (error) {
+            this.handleError(error, 'exportUsers');
             alert('Failed to export users');
         }
     }
@@ -599,62 +744,87 @@ class AdminPortal {
         document.getElementById('addUserError').classList.add('hidden');
     }
 
-    async createUser() {
-        const formData = new FormData(document.getElementById('addUserForm'));
-        const userData = {
-            name: formData.get('name'),
-            email: formData.get('email'),
-            password: formData.get('password'),
-            role: formData.get('role'),
-            emailVerified: formData.get('emailVerified') === 'on'
+    /**
+     * Unified user action handler
+     * @param {string} action - Action to perform (create, update, delete)
+     * @param {string} userId - User ID (for update/delete)
+     * @param {Object} userData - User data (for create/update)
+     */
+    async performUserAction(action, userId = null, userData = null) {
+        const actions = {
+            create: { method: 'POST', endpoint: '/users/create', data: userData },
+            update: { method: 'PUT', endpoint: `/users/${userId}`, data: userData },
+            delete: { method: 'DELETE', endpoint: `/users/${userId}` }
         };
-
-        const errorDiv = document.getElementById('addUserError');
-
+        
+        const config = actions[action];
+        if (!config) {
+            throw new Error(`Unknown action: ${action}`);
+        }
+        
         try {
-            const response = await fetch('/api/admin/users/create', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(userData),
+            if (action === 'delete' && !confirm('Are you sure you want to delete this user?')) {
+                return;
+            }
+            
+            await this.apiRequest(config.endpoint, {
+                method: config.method,
+                body: config.data ? JSON.stringify(config.data) : undefined
             });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                this.hideAddUserModal();
-                this.loadUsers(); // Refresh the user list
-                alert(`User "${userData.name}" created successfully!`);
-            } else {
-                errorDiv.textContent = result.error || 'Failed to create user';
+            
+            await this.loadUsers();
+            this.hideAddUserModal();
+            
+            console.log(`User ${action} successful`);
+            alert(`User ${action} successful!`);
+        } catch (error) {
+            this.handleError(error, `performUserAction-${action}`);
+            const errorDiv = document.getElementById('addUserError');
+            if (errorDiv) {
+                errorDiv.textContent = `Failed to ${action} user. Please try again.`;
                 errorDiv.classList.remove('hidden');
             }
-        } catch (error) {
-            errorDiv.textContent = 'Failed to create user. Please try again.';
-            errorDiv.classList.remove('hidden');
         }
+    }
+
+    async createUser(userDataParam = null) {
+        let userData;
+        
+        if (!userDataParam) {
+            const formData = new FormData(document.getElementById('addUserForm'));
+            userData = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                password: formData.get('password'),
+                role: formData.get('role'),
+                emailVerified: formData.get('emailVerified') === 'on'
+            };
+        } else {
+            userData = userDataParam;
+        }
+
+        const errorDiv = document.getElementById('addUserError');
+        if (errorDiv) {
+            errorDiv.classList.add('hidden');
+        }
+
+        return this.performUserAction('create', null, userData);
+    }
+
+    async updateUser(userId, userData) {
+        return this.performUserAction('update', userId, userData);
     }
 
     // Security Dashboard
     async loadSecurityDashboard() {
         try {
-            const response = await fetch('/api/admin/security/audit', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                
-                // Update security stats
-                document.getElementById('bannedUsers').textContent = data.stats.bannedUsers;
-                document.getElementById('adminCount').textContent = data.stats.adminUsers;
-            }
+            const data = await this.apiRequest('/security/audit');
+            
+            // Update security stats
+            this.updateElement('bannedUsers', data.stats.bannedUsers);
+            this.updateElement('adminCount', data.stats.adminUsers);
         } catch (error) {
-            console.error('Failed to load security data:', error);
+            this.handleError(error, 'loadSecurityDashboard');
         }
     }
 
@@ -662,42 +832,25 @@ class AdminPortal {
         console.log('📊 Loading real statistics from API...');
         
         try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                console.error('❌ No authentication token found');
-                this.showPlaceholderStats();
-                return;
-            }
-
-            console.log('🔑 Making API request with token...');
-            const response = await fetch('/api/admin/statistics', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            console.log('📡 API Response status:', response.status);
-
-            if (response.ok) {
-                const stats = await response.json();
-                console.log('✅ Real statistics loaded successfully:', stats);
-                
-                // Update all statistics with real data
-                this.renderRealStatistics(stats);
-                
-                // Render charts with real data
-                this.renderRealCharts(stats);
-                
-                console.log('🎯 Real statistics and charts rendered');
-            } else {
-                console.error('❌ Failed to load statistics:', response.status, response.statusText);
-                this.showPlaceholderStats();
-            }
+            const stats = await this.apiRequest('/statistics');
+            console.log('✅ Real statistics loaded successfully:', stats);
+            
+            // Update all statistics with real data
+            this.renderRealStatistics(stats);
+            
+            // Render charts with real data
+            this.renderRealCharts(stats);
+            
+            console.log('🎯 Real statistics and charts rendered');
         } catch (error) {
-            console.error('� Error loading statistics:', error);
+            this.handleError(error, 'loadStatistics');
             this.showPlaceholderStats();
         }
+    }
+
+    async loadDetailedStatistics() {
+        // Alias for loadStatistics to maintain compatibility
+        return this.loadStatistics();
     }
 
     renderRealStatistics(stats) {
@@ -721,16 +874,6 @@ class AdminPortal {
             console.log('✅ Real statistics data rendered successfully');
         } catch (error) {
             console.error('❌ Error rendering real statistics:', error);
-        }
-    }
-
-    updateElement(id, value) {
-        const element = document.getElementById(id);
-        if (element) {
-            element.textContent = value;
-            console.log(`✅ Updated ${id}: ${value}`);
-        } else {
-            console.warn(`⚠️ Element not found: ${id}`);
         }
     }
 
@@ -817,50 +960,6 @@ class AdminPortal {
             userGrowth: userGrowthData,
             messageActivity: messageActivityData
         };
-    }
-
-    loadTestCharts() {
-        console.log('📊 Loading test charts...');
-        
-        // Simple test data
-        const testData = {
-            userGrowth: [
-                { date: 'Sep 8', count: 5 },
-                { date: 'Sep 9', count: 8 },
-                { date: 'Sep 10', count: 12 },
-                { date: 'Sep 11', count: 15 },
-                { date: 'Sep 12', count: 10 },
-                { date: 'Sep 13', count: 18 },
-                { date: 'Sep 14', count: 22 }
-            ],
-            messageActivity: [
-                { date: 'Sep 8', count: 25 },
-                { date: 'Sep 9', count: 32 },
-                { date: 'Sep 10', count: 45 },
-                { date: 'Sep 11', count: 38 },
-                { date: 'Sep 12', count: 52 },
-                { date: 'Sep 13', count: 41 },
-                { date: 'Sep 14', count: 65 }
-            ]
-        };
-
-        try {
-            this.renderCharts(testData);
-            console.log('✅ Test charts rendered successfully');
-        } catch (error) {
-            console.error('❌ Error rendering test charts:', error);
-        }
-    }
-
-    renderRealStatistics(stats) {
-        // Update overview metrics using correct element IDs
-        document.getElementById('statsTotalUsers').textContent = stats.overview?.totalUsers?.toLocaleString() || '0';
-        document.getElementById('statsTotalMessages').textContent = stats.overview?.totalMessages?.toLocaleString() || '0';
-        document.getElementById('statsTotalConversations').textContent = stats.overview?.totalConversations?.toLocaleString() || '0';
-        document.getElementById('statsActiveUsers').textContent = stats.overview?.activeUsers?.toLocaleString() || '0';
-
-        // Update last updated time
-        document.getElementById('statsLastUpdated').textContent = new Date(stats.lastUpdated || Date.now()).toLocaleString();
     }
 
     renderRealCharts(stats) {
@@ -1101,80 +1200,31 @@ class AdminPortal {
                     datasets: [{
                         label: 'New Users',
                         data: chartData.userGrowth.map(item => item.count),
-                        borderColor: '#3B82F6',
+                        borderColor: 'rgb(59, 130, 246)',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#3B82F6',
-                        pointBorderColor: '#ffffff',
-                        pointBorderWidth: 2,
-                        pointRadius: 6,
-                        pointHoverRadius: 8
+                        tension: 0.1,
+                        fill: true
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                maxTicksLimit: 6,
+                                precision: 0
+                            }
+                        }
                     },
                     plugins: {
                         legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                color: '#374151',
-                                font: {
-                                    size: 14,
-                                    weight: '500'
-                                },
-                                padding: 20
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            titleColor: '#374151',
-                            bodyColor: '#6B7280',
-                            borderColor: '#E5E7EB',
-                            borderWidth: 1,
-                            cornerRadius: 8,
-                            displayColors: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                display: true,
-                                color: 'rgba(229, 231, 235, 0.5)'
-                            },
-                            ticks: {
-                                color: '#6B7280',
-                                font: {
-                                    size: 12
-                                }
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                display: true,
-                                color: 'rgba(229, 231, 235, 0.5)'
-                            },
-                            ticks: {
-                                maxTicksLimit: 6,
-                                precision: 0,
-                                color: '#6B7280',
-                                font: {
-                                    size: 12
-                                }
-                            }
+                            display: false
                         }
                     }
                 }
             });
-            console.log('✅ User growth chart created successfully');
         } catch (error) {
             console.error('❌ Error creating user growth chart:', error);
         }
@@ -1204,73 +1254,29 @@ class AdminPortal {
                         label: 'Messages',
                         data: chartData.messageActivity.map(item => item.count),
                         backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                        borderColor: '#10B981',
-                        borderWidth: 0,
-                        borderRadius: 6,
-                        borderSkipped: false
+                        borderColor: 'rgb(16, 185, 129)',
+                        borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                maxTicksLimit: 6,
+                                precision: 0
+                            }
+                        }
                     },
                     plugins: {
                         legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                color: '#374151',
-                                font: {
-                                    size: 14,
-                                    weight: '500'
-                                },
-                                padding: 20
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            titleColor: '#374151',
-                            bodyColor: '#6B7280',
-                            borderColor: '#E5E7EB',
-                            borderWidth: 1,
-                            cornerRadius: 8,
-                            displayColors: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                color: '#6B7280',
-                                font: {
-                                    size: 12
-                                }
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                display: true,
-                                color: 'rgba(229, 231, 235, 0.5)'
-                            },
-                            ticks: {
-                                maxTicksLimit: 6,
-                                precision: 0,
-                                color: '#6B7280',
-                                font: {
-                                    size: 12
-                                }
-                            }
+                            display: false
                         }
                     }
                 }
             });
-            console.log('✅ Message activity chart created successfully');
         } catch (error) {
             console.error('❌ Error creating message activity chart:', error);
         }
@@ -1278,7 +1284,7 @@ class AdminPortal {
 
     async exportStatistics() {
         try {
-            const response = await fetch('/api/admin/statistics/export', {
+            const response = await fetch(`${this.baseURL}/export/statistics`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
                 },
@@ -1298,181 +1304,7 @@ class AdminPortal {
                 alert('Failed to export statistics');
             }
         } catch (error) {
-            alert('Failed to export statistics');
-        }
-    }
-
-    loadStatistics() {
-        this.loadDetailedStatistics();
-    }
-
-    async loadDetailedStatistics() {
-        try {
-            const response = await fetch('/api/admin/statistics', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const stats = await response.json();
-                this.renderStatistics(stats);
-                this.renderCharts(stats.charts);
-            } else {
-                console.error('Failed to load statistics');
-            }
-        } catch (error) {
-            console.error('Failed to load statistics:', error);
-        }
-    }
-
-    renderStatistics(stats) {
-        // Update total stats
-        document.getElementById('statsTotalUsers').textContent = stats.totalUsers;
-        document.getElementById('statsTotalMessages').textContent = stats.totalMessages;
-        document.getElementById('statsTotalConversations').textContent = stats.totalConversations;
-        document.getElementById('statsActiveUsers').textContent = stats.activeUsers;
-        
-        // Update growth percentages
-        document.getElementById('statsUserGrowth').textContent = stats.userGrowth;
-        document.getElementById('statsMessageGrowth').textContent = stats.messageGrowth;
-        document.getElementById('statsConversationGrowth').textContent = stats.conversationGrowth;
-        document.getElementById('statsActiveGrowth').textContent = stats.activeGrowth;
-        
-        // Update detailed statistics
-        document.getElementById('statsRegisteredUsers').textContent = stats.registeredUsers;
-        document.getElementById('statsVerifiedUsers').textContent = stats.verifiedUsers;
-        document.getElementById('statsAdminUsers').textContent = stats.adminUsers;
-        document.getElementById('statsBannedUsers').textContent = stats.bannedUsers;
-        document.getElementById('stats2FAUsers').textContent = stats.twoFAUsers;
-        document.getElementById('statsRecentLogins').textContent = stats.recentLogins;
-        
-        // Update performance metrics
-        document.getElementById('statsAvgMessages').textContent = stats.avgMessages;
-        document.getElementById('statsAvgConversations').textContent = stats.avgConversations;
-        document.getElementById('statsPeakHour').textContent = stats.peakHour;
-        document.getElementById('statsDatabaseSize').textContent = stats.databaseSize;
-        document.getElementById('statsStorageUsed').textContent = stats.storageUsed;
-        document.getElementById('statsUptime').textContent = stats.uptime;
-    }
-
-    renderCharts(chartData) {
-        // Render user growth chart
-        if (chartData.userGrowth) {
-            this.renderUserGrowthChart(chartData.userGrowth);
-        }
-        
-        // Render message activity chart
-        if (chartData.messageActivity) {
-            this.renderMessageActivityChart(chartData.messageActivity);
-        }
-    }
-
-    renderUserGrowthChart(data) {
-        const ctx = document.getElementById('userGrowthChart').getContext('2d');
-        
-        // Destroy existing chart if it exists
-        if (this.userGrowthChart) {
-            this.userGrowthChart.destroy();
-        }
-
-        this.userGrowthChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.labels,
-                datasets: [{
-                    label: 'New Users',
-                    data: data.data,
-                    borderColor: 'rgb(59, 130, 246)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.1,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            maxTicksLimit: 6,
-                            precision: 0
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                }
-            }
-        });
-    }
-
-    renderMessageActivityChart(data) {
-        const ctx = document.getElementById('messageActivityChart').getContext('2d');
-        
-        // Destroy existing chart if it exists
-        if (this.messageActivityChart) {
-            this.messageActivityChart.destroy();
-        }
-
-        this.messageActivityChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: data.labels,
-                datasets: [{
-                    label: 'Messages',
-                    data: data.data,
-                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                    borderColor: 'rgb(16, 185, 129)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            maxTicksLimit: 6,
-                            precision: 0
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                }
-            }
-        });
-    }
-
-    async exportStatistics() {
-        try {
-            const response = await fetch('/api/admin/export/statistics', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `statistics_report_${new Date().toISOString().split('T')[0]}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            } else {
-                alert('Failed to export statistics');
-            }
-        } catch (error) {
+            this.handleError(error, 'exportStatistics');
             alert('Failed to export statistics');
         }
     }

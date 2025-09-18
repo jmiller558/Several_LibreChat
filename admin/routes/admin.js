@@ -9,6 +9,10 @@ const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 
+// Import services
+const AdminService = require('../services/AdminService');
+const adminService = AdminService.instance;
+
 // Import middleware
 const { verifyAdmin, protectSuperAdmin } = require('../middleware/adminProtection');
 
@@ -669,6 +673,136 @@ router.get('/database/info', verifyAdmin, async (req, res) => {
       database: stats,
       collections: collections.map(col => col.name)
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =================================
+// SUPER ADMIN MANAGEMENT ENDPOINTS
+// =================================
+
+// Get super admin status
+router.get('/superadmin/status', verifyAdmin, async (req, res) => {
+  try {
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const status = await adminService.getSuperAdminStatus();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get system summary
+router.get('/superadmin/system-summary', verifyAdmin, async (req, res) => {
+  try {
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const summary = await adminService.getSystemSummary();
+    res.json(summary);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update super admin credentials
+router.post('/superadmin/sync', verifyAdmin, async (req, res) => {
+  try {
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const result = await adminService.updateSuperAdminCredentials();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cleanup duplicates
+router.post('/superadmin/cleanup', verifyAdmin, async (req, res) => {
+  try {
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const result = await adminService.cleanupDuplicateSuperAdmins();
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get comprehensive service status
+router.get('/superadmin/service-status', verifyAdmin, async (req, res) => {
+  try {
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const status = await adminService.getComprehensiveStatus();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Force sync operations
+router.post('/superadmin/force-sync', verifyAdmin, async (req, res) => {
+  try {
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const syncResult = await adminService.forceSyncNow();
+    const credentialResult = await adminService.forceCredentialCheck();
+    
+    res.json({
+      success: true,
+      realTimeSync: syncResult,
+      credentialSync: credentialResult
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Perform system maintenance
+router.post('/superadmin/maintenance', verifyAdmin, async (req, res) => {
+  try {
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const result = await adminService.performMaintenance();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Promote user to super admin
+router.post('/superadmin/promote/:userId', verifyAdmin, async (req, res) => {
+  try {
+    if (!req.user.isSuperAdmin) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const { userId } = req.params;
+    const { password } = req.body;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const result = await adminService.promoteExistingUserToSuperAdmin(user.email, password);
+    res.json({ success: true, user: result });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

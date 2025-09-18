@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "useDefineForClassFields": true,
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
-    "allowJs": true,
+    "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": false,
     "allowSyntheticDefaultImports": true,
@@ -14,28 +13,16 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noImplicitAny": false,
-    "noEmit": false,
-    "declaration": true,
-    "declarationDir": "./types",
-    "jsx": "preserve",
-    "baseUrl": "..",
-    "paths": {
-      "~/*": ["./client/src/*"],
-      "test/*": ["./client/test/*"],
-      "*": ["./client/*", "../node_modules/*"],
-      "librechat-data-provider/*": ["./packages/data-provider/*"]
-    }
+    "noEmit": true,
+    "jsx": "preserve"
   },
-  "types": ["node", "jest", "@testing-library/jest-dom"],
-  "exclude": ["node_modules", "vite.config.ts"],
   "include": [
-    "src/**/*",
-    "test/**/*",
-    "../e2e/**/*",
-    "test/setupTests.js",
-    "env.d.ts",
-    "../config/translations/**/*.ts",
-    "../packages/client/src/hooks/useDelayedRender.tsx",
-    "../packages/client/src/components/InfoHoverCard.tsx"
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.js",
+    "**/*.jsx"
   ]
 }

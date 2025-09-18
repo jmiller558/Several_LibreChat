@@ -1,13 +1,12 @@
 const express = require('express');
-const SuperAdminService = require('../services/superAdminService');
-const realTimeSyncService = require('../services/realTimeSyncService');
+const AdminService = require('../services/AdminService');
 const { verifySuperAdmin } = require('../middleware/adminProtection');
 const router = express.Router();
 
 // Health check for super admin status
 router.get('/super-admin-status', async (req, res) => {
   try {
-    const status = await SuperAdminService.getSuperAdminStatus();
+    const status = await AdminService.getSuperAdminStatus();
     res.json(status);
   } catch (error) {
     res.status(500).json({ error: 'Failed to check super admin status' });
@@ -17,7 +16,7 @@ router.get('/super-admin-status', async (req, res) => {
 // Manual super admin sync endpoint (only for super admin)
 router.post('/sync-super-admin', verifySuperAdmin, async (req, res) => {
   try {
-    const result = await SuperAdminService.updateSuperAdminCredentials();
+    const result = await AdminService.updateSuperAdminCredentials();
     
     res.json({
       message: 'Super admin sync completed',
@@ -33,7 +32,7 @@ router.post('/sync-super-admin', verifySuperAdmin, async (req, res) => {
 // Real-time sync service status
 router.get('/sync-status', verifySuperAdmin, async (req, res) => {
   try {
-    const status = realTimeSyncService.getStatus();
+    const status = AdminService.getSyncStatus();
     res.json(status);
   } catch (error) {
     console.error('Error getting sync status:', error);
@@ -44,7 +43,7 @@ router.get('/sync-status', verifySuperAdmin, async (req, res) => {
 // Force immediate sync
 router.post('/force-sync', verifySuperAdmin, async (req, res) => {
   try {
-    const result = await realTimeSyncService.forceSyncNow();
+    const result = await AdminService.forceSyncNow();
     res.json({
       message: 'Immediate sync completed',
       status: result
@@ -58,7 +57,7 @@ router.post('/force-sync', verifySuperAdmin, async (req, res) => {
 // Clean up duplicate emails
 router.post('/cleanup-duplicates', verifySuperAdmin, async (req, res) => {
   try {
-    const result = await realTimeSyncService.cleanupAllDuplicates();
+    const result = await AdminService.cleanupAllDuplicates();
     
     if (result.success) {
       res.json({
@@ -80,10 +79,10 @@ router.post('/cleanup-duplicates', verifySuperAdmin, async (req, res) => {
 // Start real-time sync service
 router.post('/start-sync', verifySuperAdmin, async (req, res) => {
   try {
-    realTimeSyncService.start();
+    AdminService.startRealTimeSync();
     res.json({
       message: 'Real-time sync service started',
-      status: realTimeSyncService.getStatus()
+      status: AdminService.getSyncStatus()
     });
   } catch (error) {
     console.error('Start sync error:', error);
@@ -94,10 +93,10 @@ router.post('/start-sync', verifySuperAdmin, async (req, res) => {
 // Stop real-time sync service
 router.post('/stop-sync', verifySuperAdmin, async (req, res) => {
   try {
-    realTimeSyncService.stop();
+    AdminService.stopRealTimeSync();
     res.json({
       message: 'Real-time sync service stopped',
-      status: realTimeSyncService.getStatus()
+      status: AdminService.getSyncStatus()
     });
   } catch (error) {
     console.error('Stop sync error:', error);
@@ -118,7 +117,7 @@ router.get('/health', (req, res) => {
 // Get system summary
 router.get('/super-admin-summary', verifySuperAdmin, async (req, res) => {
   try {
-    const summary = await SuperAdminService.getSystemSummary();
+    const summary = await AdminService.getSystemSummary();
     res.json(summary);
   } catch (error) {
     console.error('Error getting system summary:', error);
@@ -140,7 +139,7 @@ router.post('/promote-user-to-super-admin', verifySuperAdmin, async (req, res) =
       return res.status(400).json({ error: 'SUPER_ADMIN_PASSWORD environment variable not set' });
     }
 
-    const result = await SuperAdminService.promoteExistingUserToSuperAdmin(email, password);
+    const result = await AdminService.promoteExistingUserToSuperAdmin(email, password);
 
     res.json({
       message: `Successfully promoted ${email} to super admin`,
