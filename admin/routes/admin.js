@@ -9,6 +9,19 @@ const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 
+// Import shared utilities
+const { 
+  validateUserExists,
+  validateAdminProtection,
+  validateRoleAssignment,
+  performUserUpdate,
+  performUserDeletion,
+  performUserBanOperation,
+  withErrorHandling,
+  sendSuccessResponse,
+  sendErrorResponse
+} = require('../utils/routeHelpers');
+
 // Import services
 const AdminService = require('../services/AdminService');
 const adminService = AdminService.instance;
@@ -81,117 +94,39 @@ router.get('/users', verifyAdmin, async (req, res) => {
 });
 
 // Update user role with admin protection
-router.put('/users/:userId/role', verifyAdmin, protectSuperAdmin, async (req, res) => {
-  try {
-    const { role } = req.body;
-    if (!['USER', 'ADMIN'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role' });
-    }
-
-    // Prevent non-super-admins from creating admins
-    if (role === 'ADMIN' && !req.user.isSuperAdmin) {
-      return res.status(403).json({ error: 'Only super admin can create admin users' });
-    }
-
-    // Check if user exists and get their current role before updating
-    const existingUser = await User.findById(req.params.userId);
-    if (!existingUser) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Prevent regular admins from changing other admins' roles
-    if (existingUser.role === 'ADMIN' && !req.user.isSuperAdmin) {
-      return res.status(403).json({ error: 'Admin users can only be managed by super admins' });
-    }
-
-    const user = await User.findByIdAndUpdate(
-      req.params.userId,
-      { role },
-      { new: true }
-    ).select('-password -refreshToken -totpSecret');
-
-    res.json({ message: 'User role updated successfully', user });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+router.put('/users/:userId/role', verifyAdmin, protectSuperAdmin, withErrorHandling(async (req, res) => {
+  const { role } = req.body;
+  if (!['USER', 'ADMIN'].includes(role)) {
+    return sendErrorResponse(res, 'Invalid role', 400);
   }
-});
+
+  const user = await performUserUpdate(req.params.userId, { role }, req.user);
+  sendSuccessResponse(res, user, 'User role updated successfully');
+}));
 
 // Ban/unban user with admin protection
-router.post('/users/:userId/ban', verifyAdmin, protectSuperAdmin, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    if (user.isSuperAdmin) {
-      return res.status(403).json({ error: 'Super admin cannot be banned' });
-    }
-
-    // Prevent regular admins from banning other admins
-    if (user.role === 'ADMIN' && !req.user.isSuperAdmin) {
-      return res.status(403).json({ error: 'Admin users can only be managed by super admins' });
-    }
-
-    // Toggle ban status
-    const banned = !user.banned;
-    const updateData = { banned };
-    if (banned) {
-      updateData.bannedAt = new Date();
-      updateData.bannedBy = req.user.id;
-    }
-
-    await User.findByIdAndUpdate(req.params.userId, updateData);
-
-    res.json({ 
-      message: `User ${banned ? 'banned' : 'unbanned'} successfully`,
-      banned 
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+router.post('/users/:userId/ban', verifyAdmin, protectSuperAdmin, withErrorHandling(async (req, res) => {
+  const { reason } = req.body;
+  
+  // Get current user to determine ban status
+  const currentUser = await validateUserExists(req.params.userId);
+  const banned = !currentUser.banned;
+  
+  const user = await performUserBanOperation(req.params.userId, banned, req.user, { reason });
+  
+  sendSuccessResponse(res, user, `User ${banned ? 'banned' : 'unbanned'} successfully`);
+}));
 
 // Delete user with admin protection
-router.delete('/users/:userId', verifyAdmin, protectSuperAdmin, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Super admin cannot be deleted
-    if (user.isSuperAdmin) {
-      return res.status(403).json({ error: 'Super admin cannot be deleted' });
-    }
-
-    // Only super admin can delete admin users
-    if (user.role === 'ADMIN' && !req.user.isSuperAdmin) {
-      return res.status(403).json({ 
-        error: 'Only super admin can delete admin users' 
-      });
-    }
-
-    // Prevent admins from deleting other admins (even if not explicitly ADMIN role)
-    if ((user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && req.user.role === 'ADMIN') {
-      return res.status(403).json({ 
-        error: 'Admin users cannot delete other admin users' 
-      });
-    }
-
-    // Delete user's conversations and messages
-    await Conversation.deleteMany({ user: req.params.userId });
-    await Message.deleteMany({ user: req.params.userId });
-    await User.findByIdAndDelete(req.params.userId);
-
-    res.json({ message: 'User deleted successfully' });
-  } catch (error) {
-    if (error.message === 'Super admin cannot be deleted') {
-      return res.status(403).json({ error: error.message });
-    }
-    res.status(500).json({ error: error.message });
-  }
-});
+router.delete('/users/:userId', verifyAdmin, protectSuperAdmin, withErrorHandling(async (req, res) => {
+  // Delete user's conversations and messages first
+  await Conversation.deleteMany({ user: req.params.userId });
+  await Message.deleteMany({ user: req.params.userId });
+  
+  const result = await performUserDeletion(req.params.userId, req.user);
+  
+  sendSuccessResponse(res, result, 'User deleted successfully');
+}));
 
 // Get comprehensive statistics
 router.get('/statistics', verifyAdmin, async (req, res) => {

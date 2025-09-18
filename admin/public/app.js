@@ -106,6 +106,180 @@ class AdminPortal {
         };
     }
 
+    // =================================
+    // SHARED DOM UTILITIES
+    // =================================
+
+    /**
+     * Shared form data extraction and validation
+     * @param {HTMLFormElement} form - Form element
+     * @param {Object} options - Extraction options
+     * @returns {Object} Extracted and validated form data
+     */
+    extractAndValidateFormData(form, options = {}) {
+        const { excludeFields = [], requiredFields = [], transformers = {} } = options;
+        
+        const formData = new FormData(form);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            if (excludeFields.includes(key)) continue;
+            
+            // Apply transformers if defined
+            if (transformers[key]) {
+                value = transformers[key](value);
+            }
+            
+            data[key] = value;
+        }
+        
+        // Add checkbox values (FormData doesn't include unchecked checkboxes)
+        const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            if (!excludeFields.includes(checkbox.name)) {
+                data[checkbox.name] = checkbox.checked;
+            }
+        });
+        
+        // Validate required fields
+        const missingFields = requiredFields.filter(field => !data[field]);
+        if (missingFields.length > 0) {
+            throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+        }
+        
+        return data;
+    }
+
+    /**
+     * Shared form population logic
+     * @param {HTMLFormElement} form - Form element
+     * @param {Object} data - Data to populate
+     * @param {Object} options - Population options
+     */
+    populateFormWithData(form, data, options = {}) {
+        const { excludeFields = [], fieldMappings = {}, formatters = {} } = options;
+        
+        Object.entries(data).forEach(([key, value]) => {
+            if (excludeFields.includes(key)) return;
+            
+            // Use field mapping if defined
+            const fieldName = fieldMappings[key] || key;
+            const field = form.elements[fieldName];
+            
+            if (!field) return;
+            
+            // Apply formatter if defined
+            if (formatters[key]) {
+                value = formatters[key](value);
+            }
+            
+            if (field.type === 'checkbox') {
+                field.checked = Boolean(value);
+            } else if (field.type === 'radio') {
+                const radioButton = form.querySelector(`input[name="${fieldName}"][value="${value}"]`);
+                if (radioButton) radioButton.checked = true;
+            } else {
+                field.value = value || '';
+            }
+        });
+    }
+
+    /**
+     * Shared API request with error handling and loading states
+     * @param {string} endpoint - API endpoint
+     * @param {Object} options - Request options
+     * @param {Object} uiOptions - UI handling options
+     * @returns {Promise<any>} Response data
+     */
+    async performAPIRequest(endpoint, options = {}, uiOptions = {}) {
+        const { 
+            showLoading = false, 
+            loadingElement = null, 
+            errorElement = null,
+            successCallback = null,
+            errorCallback = null 
+        } = uiOptions;
+        
+        try {
+            // Show loading state
+            if (showLoading && loadingElement) {
+                this.updateElement(loadingElement, 'Loading...', 'textContent');
+            }
+            
+            const response = await this.apiRequest(endpoint, options);
+            
+            // Handle success
+            if (successCallback) {
+                successCallback(response);
+            }
+            
+            return response;
+            
+        } catch (error) {
+            // Handle error
+            if (errorElement) {
+                this.updateElement(errorElement, error.message, 'textContent');
+            }
+            
+            if (errorCallback) {
+                errorCallback(error);
+            } else {
+                this.handleError(error, `API request to ${endpoint}`);
+            }
+            
+            throw error;
+            
+        } finally {
+            // Clear loading state
+            if (showLoading && loadingElement) {
+                this.updateElement(loadingElement, '', 'textContent');
+            }
+        }
+    }
+
+    /**
+     * Shared statistics rendering logic
+     * @param {Object} stats - Statistics data
+     * @param {Object} elementMappings - Mapping of data keys to element IDs
+     * @param {Object} formatters - Value formatters
+     */
+    renderStatisticsData(stats, elementMappings, formatters = {}) {
+        Object.entries(elementMappings).forEach(([statKey, elementId]) => {
+            const value = this.getNestedValue(stats, statKey);
+            if (value !== undefined) {
+                const formattedValue = formatters[statKey] ? 
+                    formatters[statKey](value) : 
+                    this.formatStatValue(value);
+                this.updateElement(elementId, formattedValue);
+            }
+        });
+    }
+
+    /**
+     * Get nested object value using dot notation
+     * @param {Object} obj - Object to search
+     * @param {string} path - Dot notation path (e.g., 'overview.totalUsers')
+     * @returns {any} Found value or undefined
+     */
+    getNestedValue(obj, path) {
+        return path.split('.').reduce((current, key) => current?.[key], obj);
+    }
+
+    /**
+     * Format statistical values with appropriate units
+     * @param {any} value - Value to format
+     * @returns {string} Formatted value
+     */
+    formatStatValue(value) {
+        if (typeof value === 'number') {
+            return value.toLocaleString();
+        }
+        if (value instanceof Date) {
+            return value.toLocaleString();
+        }
+        return String(value || '0');
+    }
+
     init() {
         if (this.token) {
             this.verifyToken();
@@ -205,16 +379,21 @@ class AdminPortal {
     async handleUserFormSubmit(e) {
         e.preventDefault();
         
-        const formData = this.extractFormData(e.target);
-        const userId = formData.userId;
-        
-        // Remove userId from form data as it's not part of user data
-        delete formData.userId;
-        
-        if (userId) {
-            await this.updateUser(userId, formData);
-        } else {
-            await this.createUser(formData);
+        try {
+            const formData = this.extractAndValidateFormData(e.target, {
+                requiredFields: ['email'],
+                excludeFields: ['userId']
+            });
+            
+            const userId = e.target.elements.userId?.value;
+            
+            if (userId) {
+                await this.updateUser(userId, formData);
+            } else {
+                await this.createUser(formData);
+            }
+        } catch (error) {
+            this.handleError(error, 'handleUserFormSubmit');
         }
     }
 
@@ -224,19 +403,11 @@ class AdminPortal {
      * @returns {Object} - Form data as object
      */
     extractFormData(form) {
-        const formData = new FormData(form);
-        const data = {};
-        
-        for (let [key, value] of formData.entries()) {
-            // Handle checkboxes and special cases
-            if (form.elements[key] && form.elements[key].type === 'checkbox') {
-                data[key] = form.elements[key].checked;
-            } else {
-                data[key] = value;
+        return this.extractAndValidateFormData(form, {
+            transformers: {
+                userId: (value) => value || undefined
             }
-        }
-        
-        return data;
+        });
     }
 
     /**
@@ -245,14 +416,11 @@ class AdminPortal {
      * @param {Object} data - Data to populate
      */
     populateForm(form, data) {
-        Object.entries(data).forEach(([key, value]) => {
-            const field = form.elements[key];
-            if (field) {
-                if (field.type === 'checkbox') {
-                    field.checked = value;
-                } else {
-                    field.value = value;
-                }
+        this.populateFormWithData(form, data, {
+            excludeFields: ['password'], // Don't populate password fields
+            formatters: {
+                createdAt: (date) => new Date(date).toLocaleDateString(),
+                updatedAt: (date) => new Date(date).toLocaleDateString()
             }
         });
     }
@@ -264,9 +432,27 @@ class AdminPortal {
         console.log('🔄 Refreshing all data...');
         
         const refreshTasks = [
-            { name: 'statistics', task: () => this.loadDetailedStatistics() },
-            { name: 'users', task: () => this.loadUsers() },
-            { name: 'security', task: () => this.loadSecurityData() }
+            { 
+                name: 'statistics', 
+                task: () => this.performAPIRequest('/statistics', {}, {
+                    successCallback: (data) => this.renderRealStatistics(data),
+                    errorCallback: (error) => console.warn('Statistics refresh failed:', error)
+                })
+            },
+            { 
+                name: 'users', 
+                task: () => this.performAPIRequest('/users', {}, {
+                    successCallback: (data) => this.renderUsers(data),
+                    errorCallback: (error) => console.warn('Users refresh failed:', error)
+                })
+            },
+            { 
+                name: 'security', 
+                task: () => this.performAPIRequest('/security', {}, {
+                    successCallback: (data) => this.updateSecurityData(data),
+                    errorCallback: (error) => console.warn('Security refresh failed:', error)
+                })
+            }
         ];
         
         await this.executeTasksWithFallback(refreshTasks);
@@ -624,26 +810,7 @@ class AdminPortal {
     }
 
     async deleteUser(userId) {
-        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/admin/users/${userId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                this.loadUsers();
-            } else {
-                alert('Failed to delete user');
-            }
-        } catch (error) {
-            alert('Failed to delete user');
-        }
+        return this.performUserAction('delete', userId);
     }
 
     // Bulk Operations
@@ -791,14 +958,12 @@ class AdminPortal {
         let userData;
         
         if (!userDataParam) {
-            const formData = new FormData(document.getElementById('addUserForm'));
-            userData = {
-                name: formData.get('name'),
-                email: formData.get('email'),
-                password: formData.get('password'),
-                role: formData.get('role'),
-                emailVerified: formData.get('emailVerified') === 'on'
-            };
+            userData = this.extractAndValidateFormData(document.getElementById('addUserForm'), {
+                requiredFields: ['name', 'email', 'password'],
+                transformers: {
+                    emailVerified: (value) => value === 'on'
+                }
+            });
         } else {
             userData = userDataParam;
         }
@@ -857,20 +1022,37 @@ class AdminPortal {
         console.log('📊 Rendering real statistics data:', stats);
         
         try {
-            // Update main dashboard cards with real data
-            if (stats.overview) {
-                this.updateElement('statsTotalUsers', stats.overview.totalUsers?.toLocaleString() || '0');
-                this.updateElement('statsTotalMessages', stats.overview.totalMessages?.toLocaleString() || '0');
-                this.updateElement('statsTotalConversations', stats.overview.totalConversations?.toLocaleString() || '0');
-                this.updateElement('statsActiveUsers', stats.overview.activeUsers?.toLocaleString() || '0');
-            }
-
-            // Update last updated timestamp
-            if (stats.lastUpdated) {
-                const lastUpdated = new Date(stats.lastUpdated).toLocaleString();
-                this.updateElement('statsLastUpdated', lastUpdated);
-            }
-
+            const elementMappings = {
+                'overview.totalUsers': 'statsTotalUsers',
+                'overview.totalMessages': 'statsTotalMessages',
+                'overview.totalConversations': 'statsTotalConversations',
+                'overview.activeUsers': 'statsActiveUsers',
+                'users.registered': 'statsRegisteredUsers',
+                'users.verified': 'statsVerifiedUsers',
+                'users.admin': 'statsAdminUsers',
+                'users.banned': 'statsBannedUsers',
+                'users.twoFactor': 'stats2FAUsers',
+                'users.recentLogins': 'statsRecentLogins',
+                'performance.avgMessagesPerUser': 'statsAvgMessages',
+                'performance.avgConversationsPerUser': 'statsAvgConversations',
+                'performance.peakHour': 'statsPeakHour',
+                'performance.databaseSize': 'statsDatabaseSize',
+                'performance.storageUsed': 'statsStorageUsed',
+                'lastUpdated': 'statsLastUpdated'
+            };
+            
+            const formatters = {
+                'performance.uptime': (seconds) => {
+                    const days = Math.floor(seconds / 86400);
+                    const hours = Math.floor((seconds % 86400) / 3600);
+                    const minutes = Math.floor((seconds % 3600) / 60);
+                    return `${days}d ${hours}h ${minutes}m`;
+                },
+                'lastUpdated': (date) => new Date(date).toLocaleString()
+            };
+            
+            this.renderStatisticsData(stats, elementMappings, formatters);
+            
             console.log('✅ Real statistics data rendered successfully');
         } catch (error) {
             console.error('❌ Error rendering real statistics:', error);

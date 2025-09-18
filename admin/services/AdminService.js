@@ -48,9 +48,126 @@ class AdminService {
       console.warn('SUPER_ADMIN_EMAIL or SUPER_ADMIN_PASSWORD not set in environment variables');
       return null;
     }
-    
+
     return { email, password };
   }
+
+  // =================================
+  // SHARED UTILITY FUNCTIONS
+  // =================================
+
+  /**
+   * Shared user lookup with validation
+   * @param {string} email - Email to search for
+   * @param {Object} options - Lookup options
+   * @returns {Promise<Object>} User lookup result
+   */
+  static async performUserLookup(email, options = {}) {
+    const { excludeId = null, requireSuperAdmin = false, createIfNotFound = false } = options;
+    
+    const query = { email };
+    if (excludeId) {
+      query._id = { $ne: excludeId };
+    }
+    
+    const user = await User.findOne(query);
+    
+    if (!user && createIfNotFound) {
+      return { user: null, shouldCreate: true };
+    }
+    
+    if (requireSuperAdmin && user && !user.isSuperAdmin) {
+      throw new Error(`User ${email} exists but is not a super admin`);
+    }
+    
+    return { user, shouldCreate: false };
+  }
+
+  /**
+   * Shared user update with password handling
+   * @param {string} userId - User ID to update
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<Object>} Updated user
+   */
+  static async performUserUpdate(userId, updateData) {
+    const { email, password, ...otherData } = updateData;
+    
+    const updates = { ...otherData };
+    
+    if (email) {
+      updates.email = email;
+    }
+    
+    if (password) {
+      updates.password = await this.hashPassword(password);
+    }
+    
+    updates.updatedAt = new Date();
+    
+    return await User.findByIdAndUpdate(userId, updates, { new: true });
+  }
+
+  /**
+   * Shared duplicate cleanup logic
+   * @param {string} email - Email to clean duplicates for
+   * @param {Object} options - Cleanup options
+   * @returns {Promise<Object>} Cleanup result
+   */
+  static async performDuplicateCleanup(email, options = {}) {
+    const { keepSuperAdmin = true, keepOldest = true } = options;
+    
+    const duplicateUsers = await User.find({ email }).sort({ createdAt: 1 });
+    
+    if (duplicateUsers.length <= 1) {
+      return { duplicatesRemoved: 0, keptUser: duplicateUsers[0] || null };
+    }
+    
+    // Determine which user to keep
+    let userToKeep;
+    if (keepSuperAdmin) {
+      userToKeep = duplicateUsers.find(user => user.isSuperAdmin);
+    }
+    if (!userToKeep && keepOldest) {
+      userToKeep = duplicateUsers[0]; // Already sorted by createdAt
+    }
+    if (!userToKeep) {
+      userToKeep = duplicateUsers[0];
+    }
+    
+    const usersToRemove = duplicateUsers.filter(
+      user => user._id.toString() !== userToKeep._id.toString()
+    );
+    
+    const deleteResult = await User.deleteMany({
+      _id: { $in: usersToRemove.map(u => u._id) }
+    });
+    
+    return { 
+      duplicatesRemoved: deleteResult.deletedCount, 
+      keptUser: userToKeep,
+      removedUsers: usersToRemove
+    };
+  }
+
+  /**
+   * Shared super admin promotion logic
+   * @param {string} userId - User ID to promote
+   * @param {Object} additionalData - Additional data to update
+   * @returns {Promise<Object>} Promoted user
+   */
+  static async performSuperAdminPromotion(userId, additionalData = {}) {
+    const promotionData = {
+      role: 'SUPER_ADMIN',
+      isSuperAdmin: true,
+      ...additionalData
+    };
+    
+    return await this.performUserUpdate(userId, promotionData);
+  }
+
+  // =================================
+  // REFACTORED EXISTING METHODS
+  // =================================
 
   /**
    * Generate user name from email
@@ -72,11 +189,8 @@ class AdminService {
    * @returns {Promise<Object|null>} User object or null
    */
   static async findUserByEmail(email, excludeId = null) {
-    const query = { email };
-    if (excludeId) {
-      query._id = { $ne: excludeId };
-    }
-    return await User.findOne(query);
+    const { user } = await this.performUserLookup(email, { excludeId });
+    return user;
   }
 
   /**
@@ -108,9 +222,8 @@ class AdminService {
    * @returns {Promise<Object>} Updated user
    */
   static async updateUserWithSuperAdminData(userId, email, password, isNewUser = false) {
-    const hashedPassword = await this.hashPassword(password);
     const updateData = {
-      password: hashedPassword,
+      password,
       role: 'SUPER_ADMIN',
       isSuperAdmin: true,
       emailVerified: true,
@@ -122,7 +235,7 @@ class AdminService {
       updateData.name = this.generateNameFromEmail(email);
     }
 
-    return await User.findByIdAndUpdate(userId, updateData, { runValidators: true });
+    return await this.performUserUpdate(userId, updateData);
   }
 
   /**
@@ -132,11 +245,9 @@ class AdminService {
    * @returns {Promise<Object>} Created user
    */
   static async createSuperAdminUser(email, password) {
-    const hashedPassword = await this.hashPassword(password);
-    
     return await User.create({
       email,
-      password: hashedPassword,
+      password: await this.hashPassword(password),
       role: 'SUPER_ADMIN',
       isSuperAdmin: true,
       name: this.generateNameFromEmail(email),
@@ -152,11 +263,48 @@ class AdminService {
    * @returns {Promise<Object>} Updated user
    */
   static async demoteFromSuperAdmin(userId, newRole = 'ADMIN') {
-    return await User.findByIdAndUpdate(userId, {
+    return await this.performUserUpdate(userId, {
       isSuperAdmin: false,
       role: newRole
     });
   }
+
+  /**
+   * Shared error handling with retry logic
+   * @param {Function} operation - Operation to retry
+   * @param {Object} options - Retry options
+   * @returns {Promise<any>} Operation result
+   */
+  static async performWithRetry(operation, options = {}) {
+    const { maxRetries = 3, retryDelay = 1000, retryCondition = null } = options;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        // Check if we should retry this error
+        if (retryCondition && !retryCondition(error)) {
+          throw error;
+        }
+        
+        // If this is the last attempt, throw the error
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // Wait before retrying
+        if (retryDelay > 0) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+        
+        console.log(`⚠️ Operation failed, retrying (attempt ${attempt + 1}/${maxRetries})...`);
+      }
+    }
+  }
+
+  // =================================
+  // USER CONVERSION AND CREATION
+  // =================================
 
   /**
    * Convert existing user to super admin
@@ -202,7 +350,9 @@ class AdminService {
 
     // Check email change
     if (superAdmin.email !== newEmail) {
-      const conflictingUser = await this.findUserByEmail(newEmail, superAdmin._id);
+      const { user: conflictingUser } = await this.performUserLookup(newEmail, { 
+        excludeId: superAdmin._id 
+      });
       
       if (conflictingUser) {
         console.log(`⚠️ Email ${newEmail} is already taken. Converting that user to super admin...`);
@@ -211,35 +361,39 @@ class AdminService {
         await this.demoteFromSuperAdmin(superAdmin._id);
         
         // Convert the conflicting user to super admin
-        await this.updateUserWithSuperAdminData(conflictingUser._id, newEmail, newPassword);
+        await this.performSuperAdminPromotion(conflictingUser._id, { 
+          email: newEmail, 
+          password: newPassword 
+        });
         
-        console.log(`✅ Converted user ${newEmail} to super admin`);
-        return { converted: true, email: newEmail };
-      } else {
-        updates.email = newEmail;
-        needsUpdate = true;
-        console.log('Super admin email will be updated');
+        return { status: 'converted', email: newEmail };
       }
+      
+      updates.email = newEmail;
+      needsUpdate = true;
     }
 
     // Check password change
-    const passwordMatch = await this.comparePassword(newPassword, superAdmin.password);
-    if (!passwordMatch) {
-      updates.password = await this.hashPassword(newPassword);
-      updates.passwordChangedAt = new Date();
+    if (newPassword && (!superAdmin.password || newPassword !== superAdmin.password)) {
+      updates.password = newPassword;
       needsUpdate = true;
-      console.log('Super admin password will be updated');
     }
 
-    // Apply updates if needed
-    if (needsUpdate) {
-      await User.findByIdAndUpdate(superAdmin._id, updates, { runValidators: true });
-      console.log('✅ Super admin credentials updated successfully');
-      return { updated: true, changes: Object.keys(updates) };
-    } else {
-      console.log('Super admin credentials are up to date');
-      return { updated: false };
+    if (!needsUpdate) {
+      return { status: 'success', message: 'No changes needed' };
     }
+
+    const updatedUser = await this.performUserUpdate(superAdmin._id, updates);
+    
+    const changes = [];
+    if (updates.email) changes.push('email');
+    if (updates.password) changes.push('password');
+    
+    return { 
+      status: 'updated', 
+      user: updatedUser, 
+      changes 
+    };
   }
 
   // =================================
@@ -252,47 +406,35 @@ class AdminService {
    * @returns {Promise<Object>} Update result
    */
   static async updateSuperAdminCredentials(retryCount = 0) {
-    const MAX_RETRIES = 3;
-    
-    try {
-      const envVars = this.validateEnvironmentVariables();
-      if (!envVars) {
-        return { status: 'skipped', reason: 'Environment variables not set' };
-      }
+    return await this.performWithRetry(
+      async () => {
+        const envVars = this.validateEnvironmentVariables();
+        if (!envVars) {
+          return { status: 'skipped', reason: 'Environment variables not set' };
+        }
 
-      const { email: newEmail, password: newPassword } = envVars;
-      const existingSuperAdmin = await this.findSuperAdmin();
-      
-      if (existingSuperAdmin) {
-        return await this.handleSuperAdminUpdate(existingSuperAdmin, newEmail, newPassword);
-      } else {
-        // Check if user with env email exists
-        const existingUser = await this.findUserByEmail(newEmail);
+        const { email: newEmail, password: newPassword } = envVars;
+        const existingSuperAdmin = await this.findSuperAdmin();
         
-        if (existingUser) {
-          return await this.handleUserConversion(existingUser, newEmail, newPassword);
+        if (existingSuperAdmin) {
+          return await this.handleSuperAdminUpdate(existingSuperAdmin, newEmail, newPassword);
         } else {
-          return await this.handleSuperAdminCreation(newEmail, newPassword);
+          // Check if user with env email exists
+          const existingUser = await this.findUserByEmail(newEmail);
+          
+          if (existingUser) {
+            return await this.handleUserConversion(existingUser, newEmail, newPassword);
+          } else {
+            return await this.handleSuperAdminCreation(newEmail, newPassword);
+          }
         }
+      },
+      {
+        maxRetries: 3,
+        retryCondition: (error) => error.code === 11000, // Only retry on duplicate key errors
+        retryDelay: 1000
       }
-      
-    } catch (error) {
-      console.error('Error updating super admin credentials:', error);
-      
-      // Handle duplicate key errors with retry logic
-      if (error.code === 11000 && retryCount < MAX_RETRIES) {
-        console.log(`🔧 Duplicate key error detected, attempting cleanup (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
-        try {
-          await this.cleanupDuplicateEmails();
-          return await this.updateSuperAdminCredentials(retryCount + 1);
-        } catch (cleanupError) {
-          console.error('❌ Cleanup failed:', cleanupError);
-          throw cleanupError;
-        }
-      }
-      
-      throw error;
-    }
+    );
   }
 
   /**
@@ -305,32 +447,25 @@ class AdminService {
       if (!envVars) return;
       
       const { email: envEmail } = envVars;
-      const usersWithEmail = await User.find({ email: envEmail });
+      const { duplicatesRemoved, keptUser } = await this.performDuplicateCleanup(envEmail);
       
-      if (usersWithEmail.length > 1) {
-        console.log(`🧹 Found ${usersWithEmail.length} users with email ${envEmail}, cleaning up...`);
+      if (duplicatesRemoved > 0) {
+        console.log(`🧹 Cleaned up ${duplicatesRemoved} duplicate users for ${envEmail}`);
         
-        // Keep the super admin, or the first one if none is super admin
-        let keepUser = usersWithEmail.find(user => user.isSuperAdmin) || usersWithEmail[0];
-        
-        // Remove duplicates
-        const deletePromises = usersWithEmail
-          .filter(user => user._id.toString() !== keepUser._id.toString())
-          .map(async (user) => {
-            console.log(`🗑️ Removing duplicate user: ${user._id}`);
-            return await User.findByIdAndDelete(user._id);
-          });
-        
-        await Promise.all(deletePromises);
-        console.log(`✅ Kept user: ${keepUser.email} (${keepUser._id})`);
+        // Ensure the kept user is a super admin if this is the env email
+        if (keptUser && !keptUser.isSuperAdmin) {
+          await this.performSuperAdminPromotion(keptUser._id);
+          console.log(`✅ Promoted kept user to super admin`);
+        }
       }
+      
     } catch (error) {
-      console.error('❌ Error cleaning up duplicate emails:', error);
+      console.error('Error cleaning up duplicate emails:', error);
       throw error;
     }
   }
 
-  /**
+    /**
    * Clean up duplicate super admins
    * @returns {Promise<Object|null>} Remaining super admin
    */
@@ -357,20 +492,18 @@ class AdminService {
         keepSuperAdmin = superAdmins[0];
       }
       
-      // Demote others
+      // Demote others using shared logic
       const demotePromises = superAdmins
         .filter(admin => admin._id.toString() !== keepSuperAdmin._id.toString())
-        .map(async (admin) => {
-          await this.demoteFromSuperAdmin(admin._id);
-          console.log(`🔄 Removed super admin status from ${admin.email}`);
-        });
+        .map(admin => this.demoteFromSuperAdmin(admin._id));
       
       await Promise.all(demotePromises);
-      console.log(`✅ Kept super admin: ${keepSuperAdmin.email}`);
+      
+      console.log(`✅ Cleanup completed. Kept super admin: ${keepSuperAdmin.email}`);
       return keepSuperAdmin;
       
     } catch (error) {
-      console.error('❌ Error cleaning up duplicate super admins:', error);
+      console.error('Error cleaning up duplicate super admins:', error);
       throw error;
     }
   }
@@ -488,36 +621,21 @@ class AdminService {
    * @returns {Promise<Object>} Promoted user
    */
   static async promoteExistingUserToSuperAdmin(email, password = null) {
-    try {
-      const existingUser = await this.findUserByEmail(email);
-      
-      if (!existingUser) {
-        throw new Error(`User with email ${email} not found`);
-      }
-
-      const currentSuperAdmin = await this.findSuperAdmin();
-      
-      if (currentSuperAdmin && currentSuperAdmin._id.toString() !== existingUser._id.toString()) {
-        await this.demoteFromSuperAdmin(currentSuperAdmin._id, 
-          currentSuperAdmin.role === 'SUPER_ADMIN' ? 'ADMIN' : currentSuperAdmin.role);
-        console.log(`🔄 Demoted ${currentSuperAdmin.email} from super admin to admin`);
-      }
-
-      // Use password from parameter or environment
-      const finalPassword = password || process.env.SUPER_ADMIN_PASSWORD;
-      if (!finalPassword) {
-        throw new Error('No password provided and SUPER_ADMIN_PASSWORD not set');
-      }
-
-      await this.updateUserWithSuperAdminData(existingUser._id, email, finalPassword);
-
-      console.log(`✅ Successfully promoted ${email} to super admin`);
-      return await User.findById(existingUser._id);
-
-    } catch (error) {
-      console.error(`❌ Error promoting user ${email} to super admin:`, error);
-      throw error;
+    const { user } = await this.performUserLookup(email);
+    
+    if (!user) {
+      throw new Error(`User with email ${email} not found`);
     }
+    
+    const updateData = {};
+    if (password) {
+      updateData.password = password;
+    }
+    
+    const promotedUser = await this.performSuperAdminPromotion(user._id, updateData);
+    
+    console.log(`✅ Successfully promoted user ${email} to super admin`);
+    return promotedUser;
   }
 
   // =================================
