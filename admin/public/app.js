@@ -594,32 +594,32 @@ class AdminPortal {
     }
 
     showSection(section) {
-        // Hide all sections
-        document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
-        
-        // Remove active class from all sidebar items
-        document.querySelectorAll('.sidebar-item').forEach(item => 
-            item.classList.remove('active'));
-        
-        // Show selected section
-        document.getElementById(`${section}-section`).classList.remove('hidden');
-        
-        // Add active class to clicked sidebar item
-        document.querySelector(`[data-section="${section}"]`).classList.add('active');
+    // Hide all sections
+    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+    
+    // Remove active class from all sidebar items
+    document.querySelectorAll('.sidebar-item').forEach(item => 
+        item.classList.remove('active'));
+    
+    // Show selected section
+    document.getElementById(`${section}-section`).classList.remove('hidden');
+    
+    // Add active class to clicked sidebar item
+    document.querySelector(`[data-section="${section}"]`).classList.add('active');
 
-        // Load section content
-        switch (section) {
-            case 'dashboard':
-                this.loadDashboard();
-                break;
-            case 'users':
-                this.loadUsers();
-                break;
-            case 'statistics':
-                this.loadDetailedStatistics();
-                break;
-        }
+    // Load section content
+    switch (section) {
+        case 'dashboard':
+            this.loadDashboard();
+            break;
+        case 'users':
+            this.loadUsers();
+            break;
+        case 'statistics':
+            this.loadStatistics(); // Changed from loadDetailedStatistics()
+            break;
     }
+}
 
     async loadDashboard() {
         try {
@@ -1012,12 +1012,7 @@ class AdminPortal {
             this.showPlaceholderStats();
         }
     }
-
-    async loadDetailedStatistics() {
-        // Alias for loadStatistics to maintain compatibility
-        return this.loadStatistics();
-    }
-
+    
     renderRealStatistics(stats) {
         console.log('📊 Rendering real statistics data:', stats);
         
