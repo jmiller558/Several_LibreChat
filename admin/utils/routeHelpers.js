@@ -48,9 +48,6 @@ function validateAdminProtection(targetUser, currentUser, options = {}) {
       throw new Error('Admin users can only be managed by super admins');
     }
   }
-  
-  // Super admins can perform any operation on admin users (including deletion)
-  // No additional checks needed - super admins have full privileges
 }
 
 /**
