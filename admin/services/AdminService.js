@@ -685,26 +685,6 @@ class AdminService {
     }
   }
 
-  /**
-   * Start real-time sync service
-   */
-  startRealTimeSync() {
-    if (this.isRunning) {
-      console.log('Real-time sync service is already running');
-      return;
-    }
-
-    console.log('Starting real-time sync service with 10-second intervals');
-    this.isRunning = true;
-    
-    // Run immediately on start
-    this.performSyncCheck();
-    
-    // Set up periodic checks
-    this.syncInterval = setInterval(() => {
-      this.performSyncCheck();
-    }, this.syncIntervalMs);
-  }
 
   /**
    * Stop real-time sync service
@@ -729,13 +709,6 @@ class AdminService {
     } catch (error) {
       await this.handleSyncError(error, 'instant sync check');
     }
-  }
-
-  /**
-   * Check for instant changes
-   */
-  async checkForInstantChanges() {
-    return this.performSyncCheck();
   }
 
   /**
@@ -957,13 +930,8 @@ class AdminService {
       
       // Ensure super admin exists
       await AdminService.ensureSuperAdminExists();
-      
-      // Start real-time sync
-      this.startRealTimeSync();
-      
-      // Start credential sync
-      await this.startPeriodicCredentialCheck();
-      
+    
+      this.performSyncCheck();    
       console.log('✅ Admin Service initialized successfully');
     } catch (error) {
       console.error('❌ Error initializing Admin Service:', error);

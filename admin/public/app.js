@@ -616,7 +616,7 @@ class AdminPortal {
             this.loadUsers();
             break;
         case 'statistics':
-            this.loadStatistics(); // Changed from loadDetailedStatistics()
+            this.loadStatistics(); 
             break;
     }
 }

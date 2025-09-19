@@ -29,6 +29,8 @@ services:
       - ./logs:/app/api/logs
   mongodb:
     container_name: chat-mongodb
+    ports:
+      - "27017:27017"
     image: mongo
     restart: always
     user: "${UID}:${GID}"
