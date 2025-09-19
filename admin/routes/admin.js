@@ -291,13 +291,21 @@ router.get('/statistics/export', async (req, res) => {
 });
 
 // Create new user
-router.post('/users/create', async (req, res) => {
+router.post('/users/create', verifyAdmin, async (req, res) => {
   try {
     const { name, email, password, role, emailVerified } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+
+    // Validate role assignment permissions
+    const assignedRole = role || 'USER';
+    try {
+      validateRoleAssignment(assignedRole, req.user);
+    } catch (error) {
+      return res.status(403).json({ error: error.message });
     }
 
     // Check if user already exists
@@ -314,7 +322,7 @@ router.post('/users/create', async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      role: role || 'USER',
+      role: assignedRole,
       emailVerified: emailVerified !== undefined ? emailVerified : true,
       provider: 'local'
     });

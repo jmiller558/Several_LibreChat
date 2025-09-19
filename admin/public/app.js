@@ -590,6 +590,16 @@ class AdminPortal {
         // Store current user for permission checks
         this.currentUser = user;
         
+        // Hide "Make Admin" button for regular admins
+        const makeAdminButton = document.getElementById('makeAdminButton');
+        if (makeAdminButton) {
+            if (user.isSuperAdmin) {
+                makeAdminButton.style.display = 'inline-block';
+            } else {
+                makeAdminButton.style.display = 'none';
+            }
+        }
+        
         this.loadDashboard();
     }
 
@@ -713,10 +723,12 @@ class AdminPortal {
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     ${user.role !== 'SUPER_ADMIN' ? `
                         ${this.canManageUser(user) ? `
-                            <button onclick="adminPortal.toggleUserRole('${user._id}', '${user.role}')" 
-                                    class="text-blue-600 hover:text-blue-900 mr-3">
-                                ${user.role === 'ADMIN' ? 'Remove Admin' : 'Make Admin'}
-                            </button>
+                            ${(user.role === 'ADMIN' || this.currentUser?.isSuperAdmin) ? `
+                                <button onclick="adminPortal.toggleUserRole('${user._id}', '${user.role}')" 
+                                        class="text-blue-600 hover:text-blue-900 mr-3">
+                                    ${user.role === 'ADMIN' ? 'Remove Admin' : 'Make Admin'}
+                                </button>
+                            ` : ''}
                             <button onclick="adminPortal.toggleUserBan('${user._id}', ${user.banned})" 
                                     class="text-yellow-600 hover:text-yellow-900 mr-3">
                                 ${user.banned ? 'Unban' : 'Ban'}
@@ -755,6 +767,12 @@ class AdminPortal {
     async toggleUserRole(userId, currentRole) {
         const newRole = currentRole === 'ADMIN' ? 'USER' : 'ADMIN';
         
+        // Check if current user can assign admin role
+        if (newRole === 'ADMIN' && !this.currentUser?.isSuperAdmin) {
+            alert('Only super admins can promote users to admin role.');
+            return;
+        }
+        
         try {
             const response = await fetch(`/api/admin/users/${userId}/role`, {
                 method: 'PUT',
@@ -768,7 +786,8 @@ class AdminPortal {
             if (response.ok) {
                 this.loadUsers();
             } else {
-                alert('Failed to update user role');
+                const errorData = await response.json();
+                alert(errorData.error || 'Failed to update user role');
             }
         } catch (error) {
             alert('Failed to update user role');
@@ -822,6 +841,14 @@ class AdminPortal {
 
         const userIds = Array.from(this.selectedUsers);
         
+        // Additional validation for role assignment
+        if (action === 'role' && params.role === 'ADMIN') {
+            if (!this.currentUser?.isSuperAdmin) {
+                alert('Only super admins can promote users to admin role.');
+                return;
+            }
+        }
+        
         // Check if any selected users are admins and current user is not super admin
         if (!this.currentUser?.isSuperAdmin && action !== 'verify') {
             const userRows = document.querySelectorAll('#usersTable tbody tr');
@@ -846,13 +873,13 @@ class AdminPortal {
         }
 
         try {
-            const response = await fetch(`/api/admin/users/bulk/${action}`, {
+            const response = await fetch(`/api/admin/users/bulk`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ userIds, ...params }),
+                body: JSON.stringify({ action, userIds, data: params }),
             });
 
             if (response.ok) {
@@ -903,6 +930,34 @@ class AdminPortal {
         document.getElementById('addUserModal').classList.remove('hidden');
         document.getElementById('addUserForm').reset();
         document.getElementById('addUserError').classList.add('hidden');
+        
+        // Set up role options based on current user permissions
+        this.setupRoleOptions();
+    }
+
+    /**
+     * Setup role options in the add user form based on current user permissions
+     */
+    setupRoleOptions() {
+        const roleSelect = document.getElementById('newUserRole');
+        if (!roleSelect) return;
+
+        // Clear existing options
+        roleSelect.innerHTML = '';
+
+        // Always allow creating regular users
+        const userOption = document.createElement('option');
+        userOption.value = 'USER';
+        userOption.textContent = 'User';
+        roleSelect.appendChild(userOption);
+
+        // Only super admins can create admin users
+        if (this.currentUser && this.currentUser.isSuperAdmin) {
+            const adminOption = document.createElement('option');
+            adminOption.value = 'ADMIN';
+            adminOption.textContent = 'Admin';
+            roleSelect.appendChild(adminOption);
+        }
     }
 
     hideAddUserModal() {

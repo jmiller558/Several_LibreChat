@@ -42,12 +42,15 @@ function validateAdminProtection(targetUser, currentUser, options = {}) {
     throw new Error('Super admin cannot be modified by regular admin');
   }
   
-  // Prevent regular admins from modifying other admins
+  // Prevent regular admins from modifying other admins (but allow super admins to delete admins)
   if (targetUser.role === 'ADMIN' && !currentUser.isSuperAdmin) {
     if (!allowSelfModification || targetUser._id.toString() !== currentUser._id.toString()) {
       throw new Error('Admin users can only be managed by super admins');
     }
   }
+  
+  // Super admins can perform any operation on admin users (including deletion)
+  // No additional checks needed - super admins have full privileges
 }
 
 /**
