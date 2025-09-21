@@ -5,9 +5,8 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 // Import services
-const SuperAdminService = require('./services/superAdminService');
-const credentialSyncService = require('./services/credentialSyncService');
-const realTimeSyncService = require('./services/realTimeSyncService');
+const AdminService = require('./services/AdminService');
+const adminService = AdminService.instance;
 
 const app = express();
 const PORT = process.env.PORT || process.env.ADMIN_PORT || 4000;
@@ -54,32 +53,24 @@ app.listen(PORT, async () => {
   console.log(`🚀 LibreChat Admin Portal running on http://localhost:${PORT}`);
   
   try {
-    // Ensure super admin exists on startup
-    await SuperAdminService.ensureSuperAdminExists();
+    // Initialize all admin services (super admin, real-time sync, credential sync)
+    await adminService.initialize();
     
-    // Start periodic credential sync (checks every 5 minutes) - legacy support
-    await credentialSyncService.startPeriodicCheck(5);
-    
-    // Start real-time sync service (checks every 10 seconds)
-    realTimeSyncService.start();
-    
-    console.log('✅ Super admin services initialized with real-time sync');
+    console.log('✅ Admin services initialized successfully');
   } catch (error) {
-    console.error('❌ Error initializing super admin services:', error);
+    console.error('❌ Error initializing admin services:', error);
   }
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
-  credentialSyncService.stopPeriodicCheck();
-  realTimeSyncService.stop();
+  AdminService.shutdown();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully...');
-  credentialSyncService.stopPeriodicCheck();
-  realTimeSyncService.stop();
+  AdminService.shutdown();
   process.exit(0);
 });

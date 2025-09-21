@@ -4,7 +4,280 @@ class AdminPortal {
         this.currentPage = 1;
         this.selectedUsers = new Set();
         this.currentUser = null; // Store current user info for permission checks
+        this.baseURL = '/api/admin';
+        this.currentSearch = '';
         this.init();
+    }
+
+    /**
+     * Reusable API request handler
+     * @param {string} endpoint - API endpoint (without base URL)
+     * @param {Object} options - Request options
+     * @returns {Promise<any>} - Response data
+     */
+    async apiRequest(endpoint, options = {}) {
+        const config = {
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            ...options
+        };
+
+        try {
+            const response = await fetch(`${this.baseURL}${endpoint}`, config);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error(`API request failed for ${endpoint}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Reusable DOM element updater
+     * @param {string} elementId - Element ID to update
+     * @param {string|number} value - Value to set
+     * @param {string} property - Property to update (textContent, innerHTML, value)
+     */
+    updateElement(elementId, value, property = 'textContent') {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element[property] = value;
+        } else {
+            console.warn(`Element with ID '${elementId}' not found`);
+        }
+    }
+
+    /**
+     * Reusable modal handler
+     * @param {string} modalId - Modal element ID
+     * @param {boolean} show - Whether to show or hide modal
+     */
+    toggleModal(modalId, show = true) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = show ? 'block' : 'none';
+        }
+    }
+
+    /**
+     * Reusable error handler
+     * @param {Error} error - Error object
+     * @param {string} context - Context where error occurred
+     */
+    handleError(error, context) {
+        console.error(`Error in ${context}:`, error);
+        // Add more error handling logic here if needed
+    }
+
+    /**
+     * Safely add event listener to element if it exists
+     * @param {string} elementId - Element ID
+     * @param {string} event - Event type
+     * @param {Function} handler - Event handler
+     */
+    addEventListenerSafe(elementId, event, handler) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.addEventListener(event, handler);
+        }
+    }
+
+    /**
+     * Debounce function for search and other frequent operations
+     * @param {Function} func - Function to debounce
+     * @param {number} wait - Wait time in milliseconds
+     */
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // =================================
+    // SHARED DOM UTILITIES
+    // =================================
+
+    /**
+     * Shared form data extraction and validation
+     * @param {HTMLFormElement} form - Form element
+     * @param {Object} options - Extraction options
+     * @returns {Object} Extracted and validated form data
+     */
+    extractAndValidateFormData(form, options = {}) {
+        const { excludeFields = [], requiredFields = [], transformers = {} } = options;
+        
+        const formData = new FormData(form);
+        const data = {};
+        
+        for (let [key, value] of formData.entries()) {
+            if (excludeFields.includes(key)) continue;
+            
+            // Apply transformers if defined
+            if (transformers[key]) {
+                value = transformers[key](value);
+            }
+            
+            data[key] = value;
+        }
+        
+        // Add checkbox values (FormData doesn't include unchecked checkboxes)
+        const checkboxes = form.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            if (!excludeFields.includes(checkbox.name)) {
+                data[checkbox.name] = checkbox.checked;
+            }
+        });
+        
+        // Validate required fields
+        const missingFields = requiredFields.filter(field => !data[field]);
+        if (missingFields.length > 0) {
+            throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+        }
+        
+        return data;
+    }
+
+    /**
+     * Shared form population logic
+     * @param {HTMLFormElement} form - Form element
+     * @param {Object} data - Data to populate
+     * @param {Object} options - Population options
+     */
+    populateFormWithData(form, data, options = {}) {
+        const { excludeFields = [], fieldMappings = {}, formatters = {} } = options;
+        
+        Object.entries(data).forEach(([key, value]) => {
+            if (excludeFields.includes(key)) return;
+            
+            // Use field mapping if defined
+            const fieldName = fieldMappings[key] || key;
+            const field = form.elements[fieldName];
+            
+            if (!field) return;
+            
+            // Apply formatter if defined
+            if (formatters[key]) {
+                value = formatters[key](value);
+            }
+            
+            if (field.type === 'checkbox') {
+                field.checked = Boolean(value);
+            } else if (field.type === 'radio') {
+                const radioButton = form.querySelector(`input[name="${fieldName}"][value="${value}"]`);
+                if (radioButton) radioButton.checked = true;
+            } else {
+                field.value = value || '';
+            }
+        });
+    }
+
+    /**
+     * Shared API request with error handling and loading states
+     * @param {string} endpoint - API endpoint
+     * @param {Object} options - Request options
+     * @param {Object} uiOptions - UI handling options
+     * @returns {Promise<any>} Response data
+     */
+    async performAPIRequest(endpoint, options = {}, uiOptions = {}) {
+        const { 
+            showLoading = false, 
+            loadingElement = null, 
+            errorElement = null,
+            successCallback = null,
+            errorCallback = null 
+        } = uiOptions;
+        
+        try {
+            // Show loading state
+            if (showLoading && loadingElement) {
+                this.updateElement(loadingElement, 'Loading...', 'textContent');
+            }
+            
+            const response = await this.apiRequest(endpoint, options);
+            
+            // Handle success
+            if (successCallback) {
+                successCallback(response);
+            }
+            
+            return response;
+            
+        } catch (error) {
+            // Handle error
+            if (errorElement) {
+                this.updateElement(errorElement, error.message, 'textContent');
+            }
+            
+            if (errorCallback) {
+                errorCallback(error);
+            } else {
+                this.handleError(error, `API request to ${endpoint}`);
+            }
+            
+            throw error;
+            
+        } finally {
+            // Clear loading state
+            if (showLoading && loadingElement) {
+                this.updateElement(loadingElement, '', 'textContent');
+            }
+        }
+    }
+
+    /**
+     * Shared statistics rendering logic
+     * @param {Object} stats - Statistics data
+     * @param {Object} elementMappings - Mapping of data keys to element IDs
+     * @param {Object} formatters - Value formatters
+     */
+    renderStatisticsData(stats, elementMappings, formatters = {}) {
+        Object.entries(elementMappings).forEach(([statKey, elementId]) => {
+            const value = this.getNestedValue(stats, statKey);
+            if (value !== undefined) {
+                const formattedValue = formatters[statKey] ? 
+                    formatters[statKey](value) : 
+                    this.formatStatValue(value);
+                this.updateElement(elementId, formattedValue);
+            }
+        });
+    }
+
+    /**
+     * Get nested object value using dot notation
+     * @param {Object} obj - Object to search
+     * @param {string} path - Dot notation path (e.g., 'overview.totalUsers')
+     * @returns {any} Found value or undefined
+     */
+    getNestedValue(obj, path) {
+        return path.split('.').reduce((current, key) => current?.[key], obj);
+    }
+
+    /**
+     * Format statistical values with appropriate units
+     * @param {any} value - Value to format
+     * @returns {string} Formatted value
+     */
+    formatStatValue(value) {
+        if (typeof value === 'number') {
+            return value.toLocaleString();
+        }
+        if (value instanceof Date) {
+            return value.toLocaleString();
+        }
+        return String(value || '0');
     }
 
     init() {
@@ -20,13 +293,13 @@ class AdminPortal {
 
     setupEventListeners() {
         // Login form
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
+        this.addEventListenerSafe('loginForm', 'submit', (e) => {
             e.preventDefault();
             this.login();
         });
 
         // Logout button
-        document.getElementById('logoutBtn').addEventListener('click', () => {
+        this.addEventListenerSafe('logoutBtn', 'click', () => {
             this.logout();
         });
 
@@ -39,106 +312,179 @@ class AdminPortal {
             });
         });
 
-        // User search and filter
-        document.getElementById('userSearch').addEventListener('input', () => {
+        // User search and filter with debouncing
+        this.addEventListenerSafe('userSearch', 'input', 
+            this.debounce(() => this.loadUsers(), 300)
+        );
+
+        this.addEventListenerSafe('roleFilter', 'change', () => {
             this.loadUsers();
         });
 
-        document.getElementById('roleFilter').addEventListener('change', () => {
-            this.loadUsers();
-        });
-
-        document.getElementById('statusFilter').addEventListener('change', () => {
+        this.addEventListenerSafe('statusFilter', 'change', () => {
             this.loadUsers();
         });
 
         // Export users
-        document.getElementById('exportUsers').addEventListener('click', () => {
+        this.addEventListenerSafe('exportUsers', 'click', () => {
             this.exportUsers();
         });
 
         // Add User modal controls
-        document.getElementById('addUserBtn').addEventListener('click', () => {
+        this.addEventListenerSafe('addUserBtn', 'click', () => {
             this.showAddUserModal();
         });
 
-        document.getElementById('closeAddUserModal').addEventListener('click', () => {
+        this.addEventListenerSafe('closeAddUserModal', 'click', () => {
             this.hideAddUserModal();
         });
 
-        document.getElementById('cancelAddUser').addEventListener('click', () => {
+        this.addEventListenerSafe('cancelAddUser', 'click', () => {
             this.hideAddUserModal();
         });
 
         // Add User form submission
-        document.getElementById('addUserForm').addEventListener('submit', (e) => {
+        this.addEventListenerSafe('addUserForm', 'submit', (e) => {
             e.preventDefault();
-            this.createUser();
+            this.handleUserFormSubmit(e);
         });
 
         // Statistics controls
-        document.getElementById('refreshStats').addEventListener('click', () => {
-            this.loadStatistics();
+        this.addEventListenerSafe('refreshStats', 'click', () => {
+            this.refreshData();
         });
 
-        document.getElementById('exportStats').addEventListener('click', () => {
+        this.addEventListenerSafe('exportStats', 'click', () => {
             this.exportStatistics();
         });
 
         // Pagination
-        document.getElementById('prevPage').addEventListener('click', () => {
+        this.addEventListenerSafe('prevPage', 'click', () => {
             if (this.currentPage > 1) {
                 this.currentPage--;
                 this.loadUsers();
             }
         });
 
-        document.getElementById('nextPage').addEventListener('click', () => {
+        this.addEventListenerSafe('nextPage', 'click', () => {
             this.currentPage++;
             this.loadUsers();
         });
+    }
 
-        // Super Admin event listeners
-        if (document.getElementById('syncSuperAdminBtn')) {
-            document.getElementById('syncSuperAdminBtn').addEventListener('click', () => {
-                this.syncSuperAdmin();
+    /**
+     * Handle user form submission with unified logic
+     * @param {Event} e - Form submit event
+     */
+    async handleUserFormSubmit(e) {
+        e.preventDefault();
+        
+        try {
+            const formData = this.extractAndValidateFormData(e.target, {
+                requiredFields: ['email'],
+                excludeFields: ['userId']
             });
+            
+            const userId = e.target.elements.userId?.value;
+            
+            if (userId) {
+                await this.updateUser(userId, formData);
+            } else {
+                await this.createUser(formData);
+            }
+        } catch (error) {
+            this.handleError(error, 'handleUserFormSubmit');
         }
+    }
 
-        if (document.getElementById('forceSyncBtn')) {
-            document.getElementById('forceSyncBtn').addEventListener('click', () => {
-                this.forceEnvironmentSync();
-            });
+    /**
+     * Extract form data into object
+     * @param {HTMLFormElement} form - Form element
+     * @returns {Object} - Form data as object
+     */
+    extractFormData(form) {
+        return this.extractAndValidateFormData(form, {
+            transformers: {
+                userId: (value) => value || undefined
+            }
+        });
+    }
+
+    /**
+     * Populate form with user data
+     * @param {HTMLFormElement} form - Form element
+     * @param {Object} data - Data to populate
+     */
+    populateForm(form, data) {
+        this.populateFormWithData(form, data, {
+            excludeFields: ['password'], // Don't populate password fields
+            formatters: {
+                createdAt: (date) => new Date(date).toLocaleDateString(),
+                updatedAt: (date) => new Date(date).toLocaleDateString()
+            }
+        });
+    }
+
+    /**
+     * Refresh all data with error handling
+     */
+    async refreshData() {
+        console.log('🔄 Refreshing all data...');
+        
+        const refreshTasks = [
+            { 
+                name: 'statistics', 
+                task: () => this.performAPIRequest('/statistics', {}, {
+                    successCallback: (data) => this.renderRealStatistics(data),
+                    errorCallback: (error) => console.warn('Statistics refresh failed:', error)
+                })
+            },
+            { 
+                name: 'users', 
+                task: () => this.performAPIRequest('/users', {}, {
+                    successCallback: (data) => this.renderUsers(data),
+                    errorCallback: (error) => console.warn('Users refresh failed:', error)
+                })
+            },
+            { 
+                name: 'security', 
+                task: () => this.performAPIRequest('/security', {}, {
+                    successCallback: (data) => this.updateSecurityData(data),
+                    errorCallback: (error) => console.warn('Security refresh failed:', error)
+                })
+            }
+        ];
+        
+        await this.executeTasksWithFallback(refreshTasks);
+    }
+
+    /**
+     * Execute multiple tasks with individual error handling
+     * @param {Array} tasks - Array of {name, task} objects
+     */
+    async executeTasksWithFallback(tasks) {
+        const results = await Promise.allSettled(
+            tasks.map(({ name, task }) => 
+                task().catch(error => {
+                    this.handleError(error, `refresh-${name}`);
+                    return null;
+                })
+            )
+        );
+        
+        const failed = results.filter(result => result.status === 'rejected');
+        if (failed.length > 0) {
+            console.warn(`${failed.length} refresh tasks failed`);
         }
+    }
 
-        if (document.getElementById('cleanupDuplicatesBtn')) {
-            document.getElementById('cleanupDuplicatesBtn').addEventListener('click', () => {
-                this.cleanupDuplicateEmails();
-            });
-        }
-
-        if (document.getElementById('forceSyncNowBtn')) {
-            document.getElementById('forceSyncNowBtn').addEventListener('click', () => {
-                this.forceSyncNow();
-            });
-        }
-
-        if (document.getElementById('refreshStatusBtn')) {
-            document.getElementById('refreshStatusBtn').addEventListener('click', () => {
-                this.refreshSuperAdminStatus();
-            });
-        }
-
-        if (document.getElementById('getSystemSummaryBtn')) {
-            document.getElementById('getSystemSummaryBtn').addEventListener('click', () => {
-                this.getSystemSummary();
-            });
-        }
-
-        if (document.getElementById('promoteUserBtn')) {
-            document.getElementById('promoteUserBtn').addEventListener('click', () => {
-                this.promoteUserToSuperAdmin();
-            });
+    async loadSecurityData() {
+        try {
+            const data = await this.apiRequest('/security');
+            this.updateElement('bannedUsers', data.stats?.bannedUsers || 0);
+            this.updateElement('adminCount', data.stats?.adminUsers || 0);
+        } catch (error) {
+            this.handleError(error, 'loadSecurityData');
         }
     }
 
@@ -244,68 +590,70 @@ class AdminPortal {
         // Store current user for permission checks
         this.currentUser = user;
         
+        // Hide "Make Admin" button for regular admins
+        const makeAdminButton = document.getElementById('makeAdminButton');
+        if (makeAdminButton) {
+            if (user.isSuperAdmin) {
+                makeAdminButton.style.display = 'inline-block';
+            } else {
+                makeAdminButton.style.display = 'none';
+            }
+        }
+        
         this.loadDashboard();
     }
 
     showSection(section) {
-        // Hide all sections
-        document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
-        
-        // Remove active class from all sidebar items
-        document.querySelectorAll('.sidebar-item').forEach(item => 
-            item.classList.remove('active'));
-        
-        // Show selected section
-        document.getElementById(`${section}-section`).classList.remove('hidden');
-        
-        // Add active class to clicked sidebar item
-        document.querySelector(`[data-section="${section}"]`).classList.add('active');
+    // Hide all sections
+    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+    
+    // Remove active class from all sidebar items
+    document.querySelectorAll('.sidebar-item').forEach(item => 
+        item.classList.remove('active'));
+    
+    // Show selected section
+    document.getElementById(`${section}-section`).classList.remove('hidden');
+    
+    // Add active class to clicked sidebar item
+    document.querySelector(`[data-section="${section}"]`).classList.add('active');
 
-        // Load section content
-        switch (section) {
-            case 'dashboard':
-                this.loadDashboard();
-                break;
-            case 'users':
-                this.loadUsers();
-                break;
-            case 'statistics':
-                this.loadStatistics();
-                break;
-        }
+    // Load section content
+    switch (section) {
+        case 'dashboard':
+            this.loadDashboard();
+            break;
+        case 'users':
+            this.loadUsers();
+            break;
+        case 'statistics':
+            this.loadStatistics(); 
+            break;
     }
+}
 
     async loadDashboard() {
         try {
-            const response = await fetch('/api/admin/stats', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const stats = await response.json();
-                
-                // Update overview stats
-                document.getElementById('totalUsers').textContent = stats.overview.totalUsers || 0;
-                document.getElementById('activeUsers').textContent = stats.overview.activeUsers || 0;
-                document.getElementById('totalConversations').textContent = stats.overview.totalConversations || 0;
-                document.getElementById('totalMessages').textContent = stats.overview.totalMessages || 0;
-                
-                // Update growth stats
-                document.getElementById('newUsersToday').textContent = stats.userGrowth.today || 0;
-                document.getElementById('newUsersWeek').textContent = stats.userGrowth.thisWeek || 0;
-                document.getElementById('newUsersMonth').textContent = stats.userGrowth.thisMonth || 0;
-            }
+            const stats = await this.apiRequest('/stats');
+            
+            // Update overview stats using reusable method
+            this.updateElement('totalUsers', stats.overview?.totalUsers || 0);
+            this.updateElement('activeUsers', stats.overview?.activeUsers || 0);
+            this.updateElement('totalConversations', stats.overview?.totalConversations || 0);
+            this.updateElement('totalMessages', stats.overview?.totalMessages || 0);
+            
+            // Update growth stats
+            this.updateElement('newUsersToday', stats.userGrowth?.today || 0);
+            this.updateElement('newUsersWeek', stats.userGrowth?.thisWeek || 0);
+            this.updateElement('newUsersMonth', stats.userGrowth?.thisMonth || 0);
         } catch (error) {
-            console.error('Failed to load dashboard stats:', error);
+            this.handleError(error, 'loadDashboard');
         }
     }
 
     async loadUsers() {
-        const search = document.getElementById('userSearch').value;
-        const role = document.getElementById('roleFilter').value;
-        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('userSearch')?.value || '';
+        const role = document.getElementById('roleFilter')?.value || '';
+        const status = document.getElementById('statusFilter')?.value || '';
         
         try {
             const params = new URLSearchParams({
@@ -315,19 +663,11 @@ class AdminPortal {
                 status,
             });
 
-            const response = await fetch(`/api/admin/users?${params}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                this.renderUsers(data.users);
-                this.renderPagination(data.pagination);
-            }
+            const data = await this.apiRequest(`/users?${params}`);
+            this.renderUsers(data.users);
+            this.renderPagination(data.pagination);
         } catch (error) {
-            console.error('Failed to load users:', error);
+            this.handleError(error, 'loadUsers');
         }
     }
 
@@ -383,10 +723,12 @@ class AdminPortal {
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     ${user.role !== 'SUPER_ADMIN' ? `
                         ${this.canManageUser(user) ? `
-                            <button onclick="adminPortal.toggleUserRole('${user._id}', '${user.role}')" 
-                                    class="text-blue-600 hover:text-blue-900 mr-3">
-                                ${user.role === 'ADMIN' ? 'Remove Admin' : 'Make Admin'}
-                            </button>
+                            ${(user.role === 'ADMIN' || this.currentUser?.isSuperAdmin) ? `
+                                <button onclick="adminPortal.toggleUserRole('${user._id}', '${user.role}')" 
+                                        class="text-blue-600 hover:text-blue-900 mr-3">
+                                    ${user.role === 'ADMIN' ? 'Remove Admin' : 'Make Admin'}
+                                </button>
+                            ` : ''}
                             <button onclick="adminPortal.toggleUserBan('${user._id}', ${user.banned})" 
                                     class="text-yellow-600 hover:text-yellow-900 mr-3">
                                 ${user.banned ? 'Unban' : 'Ban'}
@@ -425,6 +767,12 @@ class AdminPortal {
     async toggleUserRole(userId, currentRole) {
         const newRole = currentRole === 'ADMIN' ? 'USER' : 'ADMIN';
         
+        // Check if current user can assign admin role
+        if (newRole === 'ADMIN' && !this.currentUser?.isSuperAdmin) {
+            alert('Only super admins can promote users to admin role.');
+            return;
+        }
+        
         try {
             const response = await fetch(`/api/admin/users/${userId}/role`, {
                 method: 'PUT',
@@ -438,7 +786,8 @@ class AdminPortal {
             if (response.ok) {
                 this.loadUsers();
             } else {
-                alert('Failed to update user role');
+                const errorData = await response.json();
+                alert(errorData.error || 'Failed to update user role');
             }
         } catch (error) {
             alert('Failed to update user role');
@@ -480,26 +829,7 @@ class AdminPortal {
     }
 
     async deleteUser(userId) {
-        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/admin/users/${userId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                this.loadUsers();
-            } else {
-                alert('Failed to delete user');
-            }
-        } catch (error) {
-            alert('Failed to delete user');
-        }
+        return this.performUserAction('delete', userId);
     }
 
     // Bulk Operations
@@ -510,6 +840,14 @@ class AdminPortal {
         }
 
         const userIds = Array.from(this.selectedUsers);
+        
+        // Additional validation for role assignment
+        if (action === 'role' && params.role === 'ADMIN') {
+            if (!this.currentUser?.isSuperAdmin) {
+                alert('Only super admins can promote users to admin role.');
+                return;
+            }
+        }
         
         // Check if any selected users are admins and current user is not super admin
         if (!this.currentUser?.isSuperAdmin && action !== 'verify') {
@@ -535,13 +873,13 @@ class AdminPortal {
         }
 
         try {
-            const response = await fetch(`/api/admin/users/bulk/${action}`, {
+            const response = await fetch(`/api/admin/users/bulk`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ userIds, ...params }),
+                body: JSON.stringify({ action, userIds, data: params }),
             });
 
             if (response.ok) {
@@ -562,7 +900,7 @@ class AdminPortal {
     // Export Users
     async exportUsers() {
         try {
-            const response = await fetch('/api/admin/users/export', {
+            const response = await fetch(`${this.baseURL}/users/export`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
                 },
@@ -582,6 +920,7 @@ class AdminPortal {
                 alert('Failed to export users');
             }
         } catch (error) {
+            this.handleError(error, 'exportUsers');
             alert('Failed to export users');
         }
     }
@@ -591,6 +930,34 @@ class AdminPortal {
         document.getElementById('addUserModal').classList.remove('hidden');
         document.getElementById('addUserForm').reset();
         document.getElementById('addUserError').classList.add('hidden');
+        
+        // Set up role options based on current user permissions
+        this.setupRoleOptions();
+    }
+
+    /**
+     * Setup role options in the add user form based on current user permissions
+     */
+    setupRoleOptions() {
+        const roleSelect = document.getElementById('newUserRole');
+        if (!roleSelect) return;
+
+        // Clear existing options
+        roleSelect.innerHTML = '';
+
+        // Always allow creating regular users
+        const userOption = document.createElement('option');
+        userOption.value = 'USER';
+        userOption.textContent = 'User';
+        roleSelect.appendChild(userOption);
+
+        // Only super admins can create admin users
+        if (this.currentUser && this.currentUser.isSuperAdmin) {
+            const adminOption = document.createElement('option');
+            adminOption.value = 'ADMIN';
+            adminOption.textContent = 'Admin';
+            roleSelect.appendChild(adminOption);
+        }
     }
 
     hideAddUserModal() {
@@ -599,62 +966,85 @@ class AdminPortal {
         document.getElementById('addUserError').classList.add('hidden');
     }
 
-    async createUser() {
-        const formData = new FormData(document.getElementById('addUserForm'));
-        const userData = {
-            name: formData.get('name'),
-            email: formData.get('email'),
-            password: formData.get('password'),
-            role: formData.get('role'),
-            emailVerified: formData.get('emailVerified') === 'on'
+    /**
+     * Unified user action handler
+     * @param {string} action - Action to perform (create, update, delete)
+     * @param {string} userId - User ID (for update/delete)
+     * @param {Object} userData - User data (for create/update)
+     */
+    async performUserAction(action, userId = null, userData = null) {
+        const actions = {
+            create: { method: 'POST', endpoint: '/users/create', data: userData },
+            update: { method: 'PUT', endpoint: `/users/${userId}`, data: userData },
+            delete: { method: 'DELETE', endpoint: `/users/${userId}` }
         };
-
-        const errorDiv = document.getElementById('addUserError');
-
+        
+        const config = actions[action];
+        if (!config) {
+            throw new Error(`Unknown action: ${action}`);
+        }
+        
         try {
-            const response = await fetch('/api/admin/users/create', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(userData),
+            if (action === 'delete' && !confirm('Are you sure you want to delete this user?')) {
+                return;
+            }
+            
+            await this.apiRequest(config.endpoint, {
+                method: config.method,
+                body: config.data ? JSON.stringify(config.data) : undefined
             });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                this.hideAddUserModal();
-                this.loadUsers(); // Refresh the user list
-                alert(`User "${userData.name}" created successfully!`);
-            } else {
-                errorDiv.textContent = result.error || 'Failed to create user';
+            
+            await this.loadUsers();
+            this.hideAddUserModal();
+            
+            console.log(`User ${action} successful`);
+            alert(`User ${action} successful!`);
+        } catch (error) {
+            this.handleError(error, `performUserAction-${action}`);
+            const errorDiv = document.getElementById('addUserError');
+            if (errorDiv) {
+                errorDiv.textContent = `Failed to ${action} user. Please try again.`;
                 errorDiv.classList.remove('hidden');
             }
-        } catch (error) {
-            errorDiv.textContent = 'Failed to create user. Please try again.';
-            errorDiv.classList.remove('hidden');
         }
+    }
+
+    async createUser(userDataParam = null) {
+        let userData;
+        
+        if (!userDataParam) {
+            userData = this.extractAndValidateFormData(document.getElementById('addUserForm'), {
+                requiredFields: ['name', 'email', 'password'],
+                transformers: {
+                    emailVerified: (value) => value === 'on'
+                }
+            });
+        } else {
+            userData = userDataParam;
+        }
+
+        const errorDiv = document.getElementById('addUserError');
+        if (errorDiv) {
+            errorDiv.classList.add('hidden');
+        }
+
+        return this.performUserAction('create', null, userData);
+    }
+
+    async updateUser(userId, userData) {
+        return this.performUserAction('update', userId, userData);
     }
 
     // Security Dashboard
     async loadSecurityDashboard() {
         try {
-            const response = await fetch('/api/admin/security/audit', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                
-                // Update security stats
-                document.getElementById('bannedUsers').textContent = data.stats.bannedUsers;
-                document.getElementById('adminCount').textContent = data.stats.adminUsers;
-            }
+            const data = await this.apiRequest('/security/audit');
+            
+            // Update security stats
+            this.updateElement('bannedUsers', data.stats.bannedUsers);
+            this.updateElement('adminCount', data.stats.adminUsers);
         } catch (error) {
-            console.error('Failed to load security data:', error);
+            this.handleError(error, 'loadSecurityDashboard');
         }
     }
 
@@ -662,75 +1052,60 @@ class AdminPortal {
         console.log('📊 Loading real statistics from API...');
         
         try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                console.error('❌ No authentication token found');
-                this.showPlaceholderStats();
-                return;
-            }
-
-            console.log('🔑 Making API request with token...');
-            const response = await fetch('/api/admin/statistics', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            console.log('📡 API Response status:', response.status);
-
-            if (response.ok) {
-                const stats = await response.json();
-                console.log('✅ Real statistics loaded successfully:', stats);
-                
-                // Update all statistics with real data
-                this.renderRealStatistics(stats);
-                
-                // Render charts with real data
-                this.renderRealCharts(stats);
-                
-                console.log('🎯 Real statistics and charts rendered');
-            } else {
-                console.error('❌ Failed to load statistics:', response.status, response.statusText);
-                this.showPlaceholderStats();
-            }
+            const stats = await this.apiRequest('/statistics');
+            console.log('✅ Real statistics loaded successfully:', stats);
+            
+            // Update all statistics with real data
+            this.renderRealStatistics(stats);
+            
+            // Render charts with real data
+            this.renderRealCharts(stats);
+            
+            console.log('🎯 Real statistics and charts rendered');
         } catch (error) {
-            console.error('� Error loading statistics:', error);
+            this.handleError(error, 'loadStatistics');
             this.showPlaceholderStats();
         }
     }
-
+    
     renderRealStatistics(stats) {
         console.log('📊 Rendering real statistics data:', stats);
         
         try {
-            // Update main dashboard cards with real data
-            if (stats.overview) {
-                this.updateElement('statsTotalUsers', stats.overview.totalUsers?.toLocaleString() || '0');
-                this.updateElement('statsTotalMessages', stats.overview.totalMessages?.toLocaleString() || '0');
-                this.updateElement('statsTotalConversations', stats.overview.totalConversations?.toLocaleString() || '0');
-                this.updateElement('statsActiveUsers', stats.overview.activeUsers?.toLocaleString() || '0');
-            }
-
-            // Update last updated timestamp
-            if (stats.lastUpdated) {
-                const lastUpdated = new Date(stats.lastUpdated).toLocaleString();
-                this.updateElement('statsLastUpdated', lastUpdated);
-            }
-
+            const elementMappings = {
+                'overview.totalUsers': 'statsTotalUsers',
+                'overview.totalMessages': 'statsTotalMessages',
+                'overview.totalConversations': 'statsTotalConversations',
+                'overview.activeUsers': 'statsActiveUsers',
+                'users.registered': 'statsRegisteredUsers',
+                'users.verified': 'statsVerifiedUsers',
+                'users.admin': 'statsAdminUsers',
+                'users.banned': 'statsBannedUsers',
+                'users.twoFactor': 'stats2FAUsers',
+                'users.recentLogins': 'statsRecentLogins',
+                'performance.avgMessagesPerUser': 'statsAvgMessages',
+                'performance.avgConversationsPerUser': 'statsAvgConversations',
+                'performance.peakHour': 'statsPeakHour',
+                'performance.databaseSize': 'statsDatabaseSize',
+                'performance.storageUsed': 'statsStorageUsed',
+                'lastUpdated': 'statsLastUpdated'
+            };
+            
+            const formatters = {
+                'performance.uptime': (seconds) => {
+                    const days = Math.floor(seconds / 86400);
+                    const hours = Math.floor((seconds % 86400) / 3600);
+                    const minutes = Math.floor((seconds % 3600) / 60);
+                    return `${days}d ${hours}h ${minutes}m`;
+                },
+                'lastUpdated': (date) => new Date(date).toLocaleString()
+            };
+            
+            this.renderStatisticsData(stats, elementMappings, formatters);
+            
             console.log('✅ Real statistics data rendered successfully');
         } catch (error) {
             console.error('❌ Error rendering real statistics:', error);
-        }
-    }
-
-    updateElement(id, value) {
-        const element = document.getElementById(id);
-        if (element) {
-            element.textContent = value;
-            console.log(`✅ Updated ${id}: ${value}`);
-        } else {
-            console.warn(`⚠️ Element not found: ${id}`);
         }
     }
 
@@ -817,50 +1192,6 @@ class AdminPortal {
             userGrowth: userGrowthData,
             messageActivity: messageActivityData
         };
-    }
-
-    loadTestCharts() {
-        console.log('📊 Loading test charts...');
-        
-        // Simple test data
-        const testData = {
-            userGrowth: [
-                { date: 'Sep 8', count: 5 },
-                { date: 'Sep 9', count: 8 },
-                { date: 'Sep 10', count: 12 },
-                { date: 'Sep 11', count: 15 },
-                { date: 'Sep 12', count: 10 },
-                { date: 'Sep 13', count: 18 },
-                { date: 'Sep 14', count: 22 }
-            ],
-            messageActivity: [
-                { date: 'Sep 8', count: 25 },
-                { date: 'Sep 9', count: 32 },
-                { date: 'Sep 10', count: 45 },
-                { date: 'Sep 11', count: 38 },
-                { date: 'Sep 12', count: 52 },
-                { date: 'Sep 13', count: 41 },
-                { date: 'Sep 14', count: 65 }
-            ]
-        };
-
-        try {
-            this.renderCharts(testData);
-            console.log('✅ Test charts rendered successfully');
-        } catch (error) {
-            console.error('❌ Error rendering test charts:', error);
-        }
-    }
-
-    renderRealStatistics(stats) {
-        // Update overview metrics using correct element IDs
-        document.getElementById('statsTotalUsers').textContent = stats.overview?.totalUsers?.toLocaleString() || '0';
-        document.getElementById('statsTotalMessages').textContent = stats.overview?.totalMessages?.toLocaleString() || '0';
-        document.getElementById('statsTotalConversations').textContent = stats.overview?.totalConversations?.toLocaleString() || '0';
-        document.getElementById('statsActiveUsers').textContent = stats.overview?.activeUsers?.toLocaleString() || '0';
-
-        // Update last updated time
-        document.getElementById('statsLastUpdated').textContent = new Date(stats.lastUpdated || Date.now()).toLocaleString();
     }
 
     renderRealCharts(stats) {
@@ -1101,80 +1432,31 @@ class AdminPortal {
                     datasets: [{
                         label: 'New Users',
                         data: chartData.userGrowth.map(item => item.count),
-                        borderColor: '#3B82F6',
+                        borderColor: 'rgb(59, 130, 246)',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#3B82F6',
-                        pointBorderColor: '#ffffff',
-                        pointBorderWidth: 2,
-                        pointRadius: 6,
-                        pointHoverRadius: 8
+                        tension: 0.1,
+                        fill: true
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                maxTicksLimit: 6,
+                                precision: 0
+                            }
+                        }
                     },
                     plugins: {
                         legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                color: '#374151',
-                                font: {
-                                    size: 14,
-                                    weight: '500'
-                                },
-                                padding: 20
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            titleColor: '#374151',
-                            bodyColor: '#6B7280',
-                            borderColor: '#E5E7EB',
-                            borderWidth: 1,
-                            cornerRadius: 8,
-                            displayColors: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                display: true,
-                                color: 'rgba(229, 231, 235, 0.5)'
-                            },
-                            ticks: {
-                                color: '#6B7280',
-                                font: {
-                                    size: 12
-                                }
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                display: true,
-                                color: 'rgba(229, 231, 235, 0.5)'
-                            },
-                            ticks: {
-                                maxTicksLimit: 6,
-                                precision: 0,
-                                color: '#6B7280',
-                                font: {
-                                    size: 12
-                                }
-                            }
+                            display: false
                         }
                     }
                 }
             });
-            console.log('✅ User growth chart created successfully');
         } catch (error) {
             console.error('❌ Error creating user growth chart:', error);
         }
@@ -1204,73 +1486,29 @@ class AdminPortal {
                         label: 'Messages',
                         data: chartData.messageActivity.map(item => item.count),
                         backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                        borderColor: '#10B981',
-                        borderWidth: 0,
-                        borderRadius: 6,
-                        borderSkipped: false
+                        borderColor: 'rgb(16, 185, 129)',
+                        borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                maxTicksLimit: 6,
+                                precision: 0
+                            }
+                        }
                     },
                     plugins: {
                         legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                color: '#374151',
-                                font: {
-                                    size: 14,
-                                    weight: '500'
-                                },
-                                padding: 20
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            titleColor: '#374151',
-                            bodyColor: '#6B7280',
-                            borderColor: '#E5E7EB',
-                            borderWidth: 1,
-                            cornerRadius: 8,
-                            displayColors: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                color: '#6B7280',
-                                font: {
-                                    size: 12
-                                }
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                display: true,
-                                color: 'rgba(229, 231, 235, 0.5)'
-                            },
-                            ticks: {
-                                maxTicksLimit: 6,
-                                precision: 0,
-                                color: '#6B7280',
-                                font: {
-                                    size: 12
-                                }
-                            }
+                            display: false
                         }
                     }
                 }
             });
-            console.log('✅ Message activity chart created successfully');
         } catch (error) {
             console.error('❌ Error creating message activity chart:', error);
         }
@@ -1278,7 +1516,7 @@ class AdminPortal {
 
     async exportStatistics() {
         try {
-            const response = await fetch('/api/admin/statistics/export', {
+            const response = await fetch(`${this.baseURL}/export/statistics`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
                 },
@@ -1298,181 +1536,7 @@ class AdminPortal {
                 alert('Failed to export statistics');
             }
         } catch (error) {
-            alert('Failed to export statistics');
-        }
-    }
-
-    loadStatistics() {
-        this.loadDetailedStatistics();
-    }
-
-    async loadDetailedStatistics() {
-        try {
-            const response = await fetch('/api/admin/statistics', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const stats = await response.json();
-                this.renderStatistics(stats);
-                this.renderCharts(stats.charts);
-            } else {
-                console.error('Failed to load statistics');
-            }
-        } catch (error) {
-            console.error('Failed to load statistics:', error);
-        }
-    }
-
-    renderStatistics(stats) {
-        // Update total stats
-        document.getElementById('statsTotalUsers').textContent = stats.totalUsers;
-        document.getElementById('statsTotalMessages').textContent = stats.totalMessages;
-        document.getElementById('statsTotalConversations').textContent = stats.totalConversations;
-        document.getElementById('statsActiveUsers').textContent = stats.activeUsers;
-        
-        // Update growth percentages
-        document.getElementById('statsUserGrowth').textContent = stats.userGrowth;
-        document.getElementById('statsMessageGrowth').textContent = stats.messageGrowth;
-        document.getElementById('statsConversationGrowth').textContent = stats.conversationGrowth;
-        document.getElementById('statsActiveGrowth').textContent = stats.activeGrowth;
-        
-        // Update detailed statistics
-        document.getElementById('statsRegisteredUsers').textContent = stats.registeredUsers;
-        document.getElementById('statsVerifiedUsers').textContent = stats.verifiedUsers;
-        document.getElementById('statsAdminUsers').textContent = stats.adminUsers;
-        document.getElementById('statsBannedUsers').textContent = stats.bannedUsers;
-        document.getElementById('stats2FAUsers').textContent = stats.twoFAUsers;
-        document.getElementById('statsRecentLogins').textContent = stats.recentLogins;
-        
-        // Update performance metrics
-        document.getElementById('statsAvgMessages').textContent = stats.avgMessages;
-        document.getElementById('statsAvgConversations').textContent = stats.avgConversations;
-        document.getElementById('statsPeakHour').textContent = stats.peakHour;
-        document.getElementById('statsDatabaseSize').textContent = stats.databaseSize;
-        document.getElementById('statsStorageUsed').textContent = stats.storageUsed;
-        document.getElementById('statsUptime').textContent = stats.uptime;
-    }
-
-    renderCharts(chartData) {
-        // Render user growth chart
-        if (chartData.userGrowth) {
-            this.renderUserGrowthChart(chartData.userGrowth);
-        }
-        
-        // Render message activity chart
-        if (chartData.messageActivity) {
-            this.renderMessageActivityChart(chartData.messageActivity);
-        }
-    }
-
-    renderUserGrowthChart(data) {
-        const ctx = document.getElementById('userGrowthChart').getContext('2d');
-        
-        // Destroy existing chart if it exists
-        if (this.userGrowthChart) {
-            this.userGrowthChart.destroy();
-        }
-
-        this.userGrowthChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.labels,
-                datasets: [{
-                    label: 'New Users',
-                    data: data.data,
-                    borderColor: 'rgb(59, 130, 246)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.1,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            maxTicksLimit: 6,
-                            precision: 0
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                }
-            }
-        });
-    }
-
-    renderMessageActivityChart(data) {
-        const ctx = document.getElementById('messageActivityChart').getContext('2d');
-        
-        // Destroy existing chart if it exists
-        if (this.messageActivityChart) {
-            this.messageActivityChart.destroy();
-        }
-
-        this.messageActivityChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: data.labels,
-                datasets: [{
-                    label: 'Messages',
-                    data: data.data,
-                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
-                    borderColor: 'rgb(16, 185, 129)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            maxTicksLimit: 6,
-                            precision: 0
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                }
-            }
-        });
-    }
-
-    async exportStatistics() {
-        try {
-            const response = await fetch('/api/admin/export/statistics', {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                },
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `statistics_report_${new Date().toISOString().split('T')[0]}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            } else {
-                alert('Failed to export statistics');
-            }
-        } catch (error) {
+            this.handleError(error, 'exportStatistics');
             alert('Failed to export statistics');
         }
     }
