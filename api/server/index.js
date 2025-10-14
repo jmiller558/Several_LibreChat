@@ -74,7 +74,25 @@ const startServer = async () => {
   app.use(express.json({ limit: '3mb' }));
   app.use(express.urlencoded({ extended: true, limit: '3mb' }));
   app.use(mongoSanitize());
-  app.use(cors());
+
+  // CORS configuration for SPA integration
+  app.use(
+    cors({
+      origin: [
+        'https://severalxconsulting.com',
+        'https://www.severalxconsulting.com',
+        'https://chat.severalxconsulting.com',
+        // Add development origins if needed
+        'http://localhost:3000',
+        'http://localhost:3080',
+      ],
+      credentials: true, // Required for cookies to be sent cross-origin
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      exposedHeaders: ['set-cookie'],
+    })
+  );
+
   app.use(cookieParser());
 
   if (!isEnabled(DISABLE_COMPRESSION)) {

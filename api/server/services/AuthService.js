@@ -380,13 +380,15 @@ const setAuthTokens = async (userId, res, sessionId = null) => {
       expires: new Date(refreshTokenExpires),
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-subdomain support
+      domain: '.severalxconsulting.com', // Added for cross-subdomain cookie sharing
     });
     res.cookie('token_provider', 'librechat', {
       expires: new Date(refreshTokenExpires),
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-subdomain support
+      domain: '.severalxconsulting.com', // Added for cross-subdomain cookie sharing
     });
     return token;
   } catch (error) {
@@ -427,13 +429,15 @@ const setOpenIDAuthTokens = (tokenset, res) => {
       expires: expirationDate,
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-subdomain support
+      domain: '.severalxconsulting.com', // Added for cross-subdomain cookie sharing
     });
     res.cookie('token_provider', 'openid', {
       expires: expirationDate,
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-subdomain support
+      domain: '.severalxconsulting.com', // Added for cross-subdomain cookie sharing
     });
     return tokenset.access_token;
   } catch (error) {
