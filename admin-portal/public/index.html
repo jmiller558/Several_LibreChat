@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LibreChat Admin Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-blue: #3B82F6;
+            --medium-blue: #2563EB;
+            --dark-blue: #1E40AF;
+            --light-blue: #60A5FA;
+        }
+        
+        body {
+            background: #F3F4F6 !important;
+            color: #1F2937 !important;
+        }
+        
+        .bg-gray-100 {
+            background: #F3F4F6 !important;
+        }
+        
+        .bg-white {
+            background: #FFFFFF !important;
+            color: #1F2937 !important;
+        }
+        
+        .text-gray-800, .text-gray-700, .text-gray-600 {
+            color: #1F2937 !important;
+        }
+        
+        .bg-blue-500, .bg-blue-600 {
+            background: var(--primary-blue) !important;
+        }
+        
+        .hover\:bg-blue-700:hover, .hover\:bg-blue-700:hover {
+            background: var(--dark-blue) !important;
+        }
+        
+        .border {
+            border-color: #D1D5DB !important;
+        }
+        
+        .focus\:border-blue-500:focus {
+            border-color: var(--primary-blue) !important;
+        }
+        
+        .sidebar-item:hover {
+            background-color: rgba(59, 130, 246, 0.1) !important;
+        }
+        
+        .sidebar-item.active {
+            background-color: rgba(59, 130, 246, 0.2) !important;
+            border-right: 3px solid var(--primary-blue) !important;
+        }
+        
+        nav.bg-white {
+            background: #FFFFFF !important;
+        }
+        
+        nav h1 {
+            color: #1F2937 !important;
+        }
+        
+        #userInfo {
+            color: #6B7280 !important;
+        }
+        
+        aside.bg-white {
+            background: #FFFFFF !important;
+        }
+        
+        input, select {
+            background: #FFFFFF !important;
+            color: #1F2937 !important;
+            border-color: #D1D5DB !important;
+        }
+        
+        .rounded-lg.shadow {
+            background: #FFFFFF !important;
+            border: 1px solid #E5E7EB;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-96">
+            <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">LibreChat Admin Portal</h2>
+            <form id="loginForm">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                    <input type="email" id="loginEmail" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                    <input type="password" id="loginPassword" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                    Login
+                </button>
+            </form>
+            <div id="loginError" class="mt-4 text-red-500 text-sm hidden"></div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainApp" class="hidden">
+        <!-- Header -->
+        <nav class="bg-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-xl font-bold text-gray-800">LibreChat Admin Portal</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span id="userInfo" class="text-gray-600"></span>
+                        <button id="logoutBtn" class="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded">
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="flex">
+            <!-- Sidebar -->
+            <aside class="w-64 min-h-screen bg-white shadow-lg">
+                <nav class="mt-8">
+                    <a href="#" class="sidebar-item active block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="dashboard">
+                        <i class="fas fa-tachometer-alt mr-3"></i>
+                        Dashboard
+                    </a>
+                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="users">
+                        <i class="fas fa-users mr-3"></i>
+                        User Management
+                    </a>
+                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="security">
+                        <i class="fas fa-shield-alt mr-3"></i>
+                        Security
+                    </a>
+                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="statistics">
+                        <i class="fas fa-chart-bar mr-3"></i>
+                        Statistics
+                    </a>
+                    <a href="#" class="sidebar-item block py-2 px-4 text-gray-700 hover:bg-blue-50" data-section="database">
+                        <i class="fas fa-database mr-3"></i>
+                        Database
+                    </a>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 p-8">
+                <!-- Dashboard Section -->
+                <div id="dashboard-section" class="section">
+                    <h2 class="text-2xl font-bold mb-6">Dashboard Overview</h2>
+                    
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                                    <i class="fas fa-users text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Total Users</p>
+                                    <p id="totalUsers" class="text-2xl font-bold text-gray-900">-</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                                    <i class="fas fa-user-check text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Active Users</p>
+                                    <p id="activeUsers" class="text-2xl font-bold text-gray-900">-</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                                    <i class="fas fa-comments text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Conversations</p>
+                                    <p id="totalConversations" class="text-2xl font-bold text-gray-900">-</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-orange-100 text-orange-600">
+                                    <i class="fas fa-envelope text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Messages</p>
+                                    <p id="totalMessages" class="text-2xl font-bold text-gray-900">-</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Growth Stats -->
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-lg font-semibold mb-4">User Growth</h3>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="text-center">
+                                <p class="text-2xl font-bold text-blue-600" id="newUsersToday">-</p>
+                                <p class="text-sm text-gray-600">New Today</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-2xl font-bold text-green-600" id="newUsersWeek">-</p>
+                                <p class="text-sm text-gray-600">New This Week</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-2xl font-bold text-purple-600" id="newUsersMonth">-</p>
+                                <p class="text-sm text-gray-600">New This Month</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Section -->
+                <div id="users-section" class="section hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">User Management</h2>
+                        <div class="flex space-x-4">
+                            <button id="addUserBtn" class="bg-blue-500 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                                <i class="fas fa-plus mr-2"></i>Add User
+                            </button>
+                            <input type="text" id="userSearch" placeholder="Search users..." class="px-4 py-2 border rounded-lg">
+                            <select id="roleFilter" class="px-4 py-2 border rounded-lg">
+                                <option value="">All Roles</option>
+                                <option value="USER">User</option>
+                                <option value="ADMIN">Admin</option>
+                            </select>
+                            <select id="statusFilter" class="px-4 py-2 border rounded-lg">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="banned">Banned</option>
+                                <option value="unverified">Unverified</option>
+                            </select>
+                            <button id="exportUsers" class="bg-green-500 hover:bg-green-700 text-white px-4 py-2 rounded">
+                                <i class="fas fa-download mr-2"></i>Export
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Bulk Actions -->
+                    <div id="bulkActions" class="mb-4 p-4 bg-gray-50 rounded-lg hidden">
+                        <div class="flex items-center space-x-4">
+                            <span class="text-sm font-medium">Bulk Actions:</span>
+                            <button onclick="adminPortal.bulkAction('ban')" class="bg-red-500 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
+                                Ban Selected
+                            </button>
+                            <button onclick="adminPortal.bulkAction('unban')" class="bg-green-500 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">
+                                Unban Selected
+                            </button>
+                            <button onclick="adminPortal.bulkAction('verify')" class="bg-blue-500 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                                Verify Email
+                            </button>
+                            <button onclick="adminPortal.bulkAction('role', {role: 'USER'})" class="bg-gray-500 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm">
+                                Make User
+                            </button>
+                            <button onclick="adminPortal.bulkAction('role', {role: 'ADMIN'})" class="bg-purple-500 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm">
+                                Make Admin
+                            </button>
+                            <span id="selectedCount" class="text-sm text-gray-600 ml-4">0 selected</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow overflow-hidden">
+                        <table class="min-w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left">
+                                        <input type="checkbox" id="selectAll" class="rounded">
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTable" class="bg-white divide-y divide-gray-200">
+                                <!-- Users will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div id="usersPagination" class="mt-4 flex justify-between items-center">
+                        <div class="text-sm text-gray-700">
+                            <span id="usersInfo">Showing 0 of 0 users</span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="prevPage" class="px-3 py-1 border rounded disabled:opacity-50" disabled>Previous</button>
+                            <span id="pageInfo" class="px-3 py-1">Page 1 of 1</span>
+                            <button id="nextPage" class="px-3 py-1 border rounded disabled:opacity-50" disabled>Next</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Section -->
+                <div id="security-section" class="section hidden">
+                    <h2 class="text-2xl font-bold mb-6">Security Dashboard</h2>
+                    
+                    <!-- Security Stats -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-red-100 text-red-600">
+                                    <i class="fas fa-ban text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Banned Users</p>
+                                    <p id="bannedUsers" class="text-2xl font-bold text-gray-900">-</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                                    <i class="fas fa-exclamation-triangle text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Unverified</p>
+                                    <p id="unverifiedUsers" class="text-2xl font-bold text-gray-900">-</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                                    <i class="fas fa-shield-alt text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">2FA Enabled</p>
+                                    <p id="twoFactorUsers" class="text-2xl font-bold text-gray-900">-</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Security Audit -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">Recent Security Events</h3>
+                            <div id="securityEvents" class="space-y-3">
+                                <p class="text-gray-500">Loading security events...</p>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">System Health</h3>
+                            <div class="space-y-4">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Email Verification Rate:</span>
+                                    <span id="verificationRate" class="font-semibold">-%</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Admin Users:</span>
+                                    <span id="adminCount" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Active Sessions:</span>
+                                    <span id="activeSessions" class="font-semibold">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics Section -->
+                <div id="statistics-section" class="section hidden">
+                    <h2 class="text-2xl font-bold mb-6">System Statistics & Analytics</h2>
+                    
+                    <!-- Key Metrics Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                                    <i class="fas fa-users text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Total Users</p>
+                                    <p id="statsTotalUsers" class="text-2xl font-bold text-gray-900">-</p>
+                                    <p class="text-xs text-green-600"><span id="statsUserGrowth">-</span>% from last month</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-green-100 text-green-600">
+                                    <i class="fas fa-comments text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Total Messages</p>
+                                    <p id="statsTotalMessages" class="text-2xl font-bold text-gray-900">-</p>
+                                    <p class="text-xs text-green-600"><span id="statsMessageGrowth">-</span>% from last month</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                                    <i class="fas fa-comment-dots text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Conversations</p>
+                                    <p id="statsTotalConversations" class="text-2xl font-bold text-gray-900">-</p>
+                                    <p class="text-xs text-green-600"><span id="statsConversationGrowth">-</span>% from last month</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex items-center">
+                                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                                    <i class="fas fa-chart-line text-2xl"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-sm font-medium text-gray-600">Active Users</p>
+                                    <p id="statsActiveUsers" class="text-2xl font-bold text-gray-900">-</p>
+                                    <p class="text-xs text-green-600"><span id="statsActiveGrowth">-</span>% this week</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts and Detailed Analytics -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                        <!-- User Growth Chart -->
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">User Growth (Last 30 Days)</h3>
+                            <canvas id="userGrowthChart" width="400" height="200"></canvas>
+                        </div>
+                        
+                        <!-- Message Activity Chart -->
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">Message Activity (Last 7 Days)</h3>
+                            <canvas id="messageActivityChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Statistics Tables -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- User Statistics -->
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">User Statistics</h3>
+                            <div class="space-y-4">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Total Registered:</span>
+                                    <span id="statsRegisteredUsers" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Email Verified:</span>
+                                    <span id="statsVerifiedUsers" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Admin Users:</span>
+                                    <span id="statsAdminUsers" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Banned Users:</span>
+                                    <span id="statsBannedUsers" class="font-semibold text-red-600">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">2FA Enabled:</span>
+                                    <span id="stats2FAUsers" class="font-semibold text-green-600">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Last 24h Logins:</span>
+                                    <span id="statsRecentLogins" class="font-semibold">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- System Performance -->
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">System Performance</h3>
+                            <div class="space-y-4">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Avg Messages/User:</span>
+                                    <span id="statsAvgMessages" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Avg Conversations/User:</span>
+                                    <span id="statsAvgConversations" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Most Active Hour:</span>
+                                    <span id="statsPeakHour" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Database Size:</span>
+                                    <span id="statsDatabaseSize" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Storage Used:</span>
+                                    <span id="statsStorageUsed" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Uptime:</span>
+                                    <span id="statsUptime" class="font-semibold text-green-600">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export and Refresh Controls -->
+                    <div class="mt-6 flex justify-between items-center">
+                        <div class="text-sm text-gray-500">
+                            Last updated: <span id="statsLastUpdated">-</span>
+                        </div>
+                        <div class="space-x-4">
+                            <button id="refreshStats" class="bg-blue-500 hover:bg-blue-700 text-white px-4 py-2 rounded">
+                                <i class="fas fa-sync-alt mr-2"></i>Refresh
+                            </button>
+                            <button id="exportStats" class="bg-green-500 hover:bg-green-700 text-white px-4 py-2 rounded">
+                                <i class="fas fa-download mr-2"></i>Export Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Database Section -->
+                <div id="database-section" class="section hidden">
+                    <h2 class="text-2xl font-bold mb-6">Database Management</h2>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div id="databaseInfo">
+                            <p>Loading database information...</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Add New User</h3>
+                <button id="closeAddUserModal" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="addUserForm">
+                <div class="space-y-4">
+                    <div>
+                        <label for="newUserName" class="block text-sm font-medium text-gray-700">Full Name</label>
+                        <input type="text" id="newUserName" name="name" required 
+                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label for="newUserEmail" class="block text-sm font-medium text-gray-700">Email Address</label>
+                        <input type="email" id="newUserEmail" name="email" required 
+                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label for="newUserPassword" class="block text-sm font-medium text-gray-700">Password</label>
+                        <input type="password" id="newUserPassword" name="password" required 
+                               class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label for="newUserRole" class="block text-sm font-medium text-gray-700">Role</label>
+                        <select id="newUserRole" name="role" 
+                                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option value="USER">User</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" id="newUserEmailVerified" name="emailVerified" checked
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label for="newUserEmailVerified" class="ml-2 block text-sm text-gray-900">
+                            Email Verified
+                        </label>
+                    </div>
+                </div>
+                
+                <div id="addUserError" class="mt-4 text-red-600 text-sm hidden"></div>
+                
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" id="cancelAddUser" 
+                            class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-plus mr-2"></i>Create User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

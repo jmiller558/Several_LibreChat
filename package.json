@@ -5,6 +5,7 @@
   "workspaces": [
     "api",
     "client",
+    "admin-portal",
     "packages/*"
   ],
   "scripts": {
@@ -150,6 +151,7 @@
       "data/",
       "client/",
       "admin/",
+      "admin-portal/",
       "packages/"
     ]
   }

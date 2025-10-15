@@ -1,0 +1,122 @@
+/* SeveralChat Admin Portal Brand Colors */
+:root {
+  --primary-burgundy: #8B3936;
+  --medium-burgundy: #A0433E;
+  --dark-burgundy: #7A3230;
+  --light-burgundy: #B54D42;
+}
+
+/* Override Tailwind and apply lite burgundy theme */
+body {
+  background: var(--light-burgundy) !important;
+  color: #fff !important;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.bg-gray-100 {
+  background: var(--light-burgundy) !important;
+}
+
+.bg-white {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: var(--dark-burgundy) !important;
+}
+
+.bg-blue-500, .hover\:bg-blue-700:hover {
+  background: var(--medium-burgundy) !important;
+}
+
+.bg-blue-500:hover {
+  background: var(--primary-burgundy) !important;
+}
+
+.text-gray-800, .text-gray-700 {
+  color: var(--dark-burgundy) !important;
+}
+
+.border {
+  border-color: var(--primary-burgundy) !important;
+}
+
+.focus\:border-blue-500:focus {
+  border-color: var(--medium-burgundy) !important;
+}
+
+.sidebar-item:hover {
+  background-color: rgba(139, 57, 54, 0.2) !important;
+}
+
+.sidebar-item.active {
+  background-color: rgba(139, 57, 54, 0.3) !important;
+  border-right: 3px solid var(--primary-burgundy) !important;
+}
+
+/* Login modal styling */
+#loginModal .bg-white {
+  background: rgba(255, 255, 255, 0.98) !important;
+  color: var(--dark-burgundy) !important;
+  border: 2px solid var(--medium-burgundy);
+}
+
+/* Button overrides */
+button, .btn-primary {
+  background: var(--medium-burgundy) !important;
+  color: #fff !important;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5em 1.2em;
+  transition: all 0.2s ease;
+}
+
+button:hover, .btn-primary:hover {
+  background: var(--primary-burgundy) !important;
+  transform: translateY(-1px);
+}
+
+/* Input field overrides */
+input, select, textarea {
+  border: 1px solid var(--primary-burgundy) !important;
+  border-radius: 6px;
+  padding: 0.5em 0.8em;
+  background: rgba(255, 255, 255, 0.98) !important;
+  color: var(--dark-burgundy) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--medium-burgundy) !important;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(160, 67, 62, 0.2);
+}
+
+/* Card and panel styling */
+.card, .panel, .rounded-lg {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: var(--dark-burgundy) !important;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(139, 57, 54, 0.15);
+  border: 1px solid var(--primary-burgundy);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-burgundy);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--light-burgundy);
+}
+
+/* Navigation and header */
+header, .navbar, nav {
+  background: var(--medium-burgundy) !important;
+}
+
+/* Additional overrides for better theming */
+.shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(139, 57, 54, 0.1), 0 10px 10px -5px rgba(181, 77, 66, 0.15) !important;
+}

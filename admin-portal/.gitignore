@@ -6,6 +6,13 @@ meili_data*
 data/
 logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Runtime data
 pids
@@ -21,6 +28,19 @@ lib-cov
 
 # Coverage directory used by tools like istanbul
 coverage
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# ESLint cache
+.eslintcache
+
+# Prettier cache
+.prettiercache
+
+# Stylelint cache
+.stylelintcache
 
 # Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
@@ -76,9 +96,6 @@ librechat.yml
 my.secrets
 !**/.env.example
 !**/.env.test.example
-
-# Admin Portal
-admin-portal/.env
 cache.json
 api/data/
 owner.yml
@@ -140,4 +157,3 @@ helm/**/.values.yaml
 /.openai/
 /.tabnine/
 /.codeium
-*.local.md

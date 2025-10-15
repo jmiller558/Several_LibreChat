@@ -74,7 +74,22 @@ const startServer = async () => {
   app.use(express.json({ limit: '3mb' }));
   app.use(express.urlencoded({ extended: true, limit: '3mb' }));
   app.use(mongoSanitize());
-  app.use(cors());
+
+  // CORS configuration for SPA integration
+  const allowedOrigins = process.env.ALLOWED_CORS_ORIGINS
+    ? process.env.ALLOWED_CORS_ORIGINS.split(',').map((origin) => origin.trim())
+    : ['http://localhost:3000', 'http://localhost:3080']; // Development defaults
+
+  app.use(
+    cors({
+      origin: allowedOrigins,
+      credentials: true, // Required for cookies to be sent cross-origin
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      exposedHeaders: ['set-cookie'],
+    })
+  );
+
   app.use(cookieParser());
 
   if (!isEnabled(DISABLE_COMPRESSION)) {

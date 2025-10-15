@@ -15,6 +15,7 @@ import {
   useRequiresKey,
   useHandleKeyUp,
   useQueryParams,
+  useInitialQuery,
   useSubmitMessage,
   useFocusChatEffect,
 } from '~/hooks';
@@ -151,6 +152,18 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
   });
 
   useQueryParams({ textAreaRef });
+
+  // Handle initial query from URL or localStorage (for SPA redirect)
+  useInitialQuery(
+    useCallback(
+      (text: string) => {
+        methods.setValue('text', text, { shouldValidate: true });
+        // Focus the textarea after setting the text
+        setTimeout(() => textAreaRef.current?.focus(), 100);
+      },
+      [methods],
+    ),
+  );
 
   const { ref, ...registerProps } = methods.register('text', {
     required: true,
