@@ -376,20 +376,16 @@ const setAuthTokens = async (userId, res, sessionId = null) => {
       refreshTokenExpires = session.expiration.getTime();
     }
 
-    res.cookie('refreshToken', refreshToken, {
+    const cookieOptions = {
       expires: new Date(refreshTokenExpires),
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-subdomain support
-      domain: '.severalxconsulting.com', // Added for cross-subdomain cookie sharing
-    });
-    res.cookie('token_provider', 'librechat', {
-      expires: new Date(refreshTokenExpires),
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-subdomain support
-      domain: '.severalxconsulting.com', // Added for cross-subdomain cookie sharing
-    });
+      sameSite: 'lax',
+      ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
+    };
+
+    res.cookie('refreshToken', refreshToken, cookieOptions);
+    res.cookie('token_provider', 'librechat', cookieOptions);
     return token;
   } catch (error) {
     logger.error('[setAuthTokens] Error in setting authentication tokens:', error);
@@ -425,20 +421,16 @@ const setOpenIDAuthTokens = (tokenset, res) => {
       logger.error('[setOpenIDAuthTokens] No access or refresh token found in tokenset');
       return;
     }
-    res.cookie('refreshToken', tokenset.refresh_token, {
+    const cookieOptions = {
       expires: expirationDate,
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-subdomain support
-      domain: '.severalxconsulting.com', // Added for cross-subdomain cookie sharing
-    });
-    res.cookie('token_provider', 'openid', {
-      expires: expirationDate,
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-subdomain support
-      domain: '.severalxconsulting.com', // Added for cross-subdomain cookie sharing
-    });
+      sameSite: 'lax',
+      ...(process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
+    };
+
+    res.cookie('refreshToken', tokenset.refresh_token, cookieOptions);
+    res.cookie('token_provider', 'openid', cookieOptions);
     return tokenset.access_token;
   } catch (error) {
     logger.error('[setOpenIDAuthTokens] Error in setting authentication tokens:', error);

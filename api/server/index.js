@@ -76,16 +76,13 @@ const startServer = async () => {
   app.use(mongoSanitize());
 
   // CORS configuration for SPA integration
+  const allowedOrigins = process.env.ALLOWED_CORS_ORIGINS
+    ? process.env.ALLOWED_CORS_ORIGINS.split(',').map((origin) => origin.trim())
+    : ['http://localhost:3000', 'http://localhost:3080']; // Development defaults
+
   app.use(
     cors({
-      origin: [
-        'https://severalxconsulting.com',
-        'https://www.severalxconsulting.com',
-        'https://chat.severalxconsulting.com',
-        // Add development origins if needed
-        'http://localhost:3000',
-        'http://localhost:3080',
-      ],
+      origin: allowedOrigins,
       credentials: true, // Required for cookies to be sent cross-origin
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
