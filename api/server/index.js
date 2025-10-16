@@ -82,7 +82,19 @@ const startServer = async () => {
 
   app.use(
     cors({
-      origin: allowedOrigins,
+      origin(origin, callback) {
+        // Allow same-origin requests (no Origin header) and explicit matches.
+        if (!origin || origin === 'null' || allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+
+        // Treat loopback numeric origins (http://127.0.0.1) as localhost.
+        if (origin?.startsWith('http://127.0.0.1')) {
+          return callback(null, true);
+        }
+
+        return callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
       credentials: true, // Required for cookies to be sent cross-origin
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

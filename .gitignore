@@ -141,3 +141,9 @@ helm/**/.values.yaml
 /.tabnine/
 /.codeium
 *.local.md
+
+# Documentation and demo files
+DOCKERFILE_EXPLAINED.md
+Dockerfile.simple
+INTEGRATION_GUIDE.md
+integration-demo/

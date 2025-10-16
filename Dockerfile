@@ -34,7 +34,17 @@ RUN \
     npm config set fetch-retry-maxtimeout 600000 ; \
     npm config set fetch-retries 5 ; \
     npm config set fetch-retry-mintimeout 15000 ; \
+    npm config set include optional ; \
     npm ci --no-audit
+
+# Install optional Smithy/AWS SDK dependencies required at runtime
+RUN npm install --no-save --legacy-peer-deps \
+    @aws-sdk/client-bedrock-runtime@3.848.0 \
+    @smithy/eventstream-codec@2.2.0 \
+    @smithy/protocol-http@3.0.6 \
+    @smithy/signature-v4@2.3.0 \
+    @smithy/util-utf8@2.0.0 \
+    winston-daily-rotate-file@5.0.0
 
 COPY --chown=node:node . .
 

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import throttle from 'lodash/throttle';
 import { useRecoilValue } from 'recoil';
-import { getConfigDefaults } from 'librechat-data-provider';
+import { EModelEndpoint, getConfigDefaults, SystemRoles } from 'librechat-data-provider';
 import {
   ResizableHandleAlt,
   ResizablePanel,
@@ -13,6 +13,9 @@ import { useGetStartupConfig } from '~/data-provider';
 import { normalizeLayout } from '~/utils';
 import SidePanel from './SidePanel';
 import store from '~/store';
+import { useAuthContext } from '~/hooks';
+import { useAgentsMapContext, useChatContext } from '~/Providers';
+import useSelectAgent from '~/hooks/Agents/useSelectAgent';
 
 interface SidePanelProps {
   defaultLayout?: number[] | undefined;
@@ -36,6 +39,11 @@ const SidePanelGroup = memo(
     children,
   }: SidePanelProps) => {
     const { data: startupConfig } = useGetStartupConfig();
+    const { user } = useAuthContext();
+    const isAdminUser = user?.role === SystemRoles.ADMIN;
+    const agentsMap = useAgentsMapContext();
+    const { conversation } = useChatContext();
+    const { onSelect: selectAgent } = useSelectAgent();
     const interfaceConfig = useMemo(
       () => startupConfig?.interface ?? defaultInterface,
       [startupConfig],
@@ -90,6 +98,24 @@ const SidePanelGroup = memo(
       }
     }, [isSmallScreen, defaultCollapsed, navCollapsedSize, fullPanelCollapse]);
 
+    useEffect(() => {
+      if (isAdminUser) {
+        return;
+      }
+
+      const firstAgentId = Object.keys(agentsMap ?? {})[0];
+      if (!firstAgentId) {
+        return;
+      }
+
+      const isAgentEndpoint = conversation?.endpoint === EModelEndpoint.agents;
+      const missingAgent = !conversation?.agent_id || !agentsMap?.[conversation.agent_id];
+
+      if (isAgentEndpoint && missingAgent) {
+        selectAgent(firstAgentId);
+      }
+    }, [agentsMap, conversation?.agent_id, conversation?.endpoint, isAdminUser, selectAgent]);
+
     const minSizeMain = useMemo(() => (artifacts != null ? 15 : 30), [artifacts]);
 
     /** Memoized close button handler to prevent re-creating it */
@@ -132,7 +158,7 @@ const SidePanelGroup = memo(
               </ResizablePanel>
             </>
           )}
-          {!hideSidePanel && interfaceConfig.sidePanel === true && (
+          {!hideSidePanel && interfaceConfig.sidePanel === true && isAdminUser && (
             <SidePanel
               panelRef={panelRef}
               minSize={minSize}
