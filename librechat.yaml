@@ -1,267 +1,52 @@
-# LibreChat Configuration File
+# LibreChat Configuration File - SeveralX Consulting
+# Version: 1.2.1
 
-# Based on librechat.example.yaml
-# For more information, see the Configuration Guide:
-# https://www.librechat.ai/docs/configuration/librechat_yaml
-
-# Configuration version (required)
 version: 1.2.1
-
-# Cache settings: Set to true to enable caching
 cache: true
 
-# Custom interface configuration
+# Custom interface configuration for SeveralX Consulting
 interface:
-  customWelcome: 'Welcome to LibreChat! Enjoy your experience.'
-  # Enable/disable file search as a chatarea selection (default: true)
-  fileSearch: true
-  # Privacy policy settings
-  privacyPolicy:
-    externalUrl: 'https://librechat.ai/privacy-policy'
-    openNewTab: true
+  customWelcome: 'Welcome to SeveralX Consulting AI! Get expert insights on AI implementation costs, technology recommendations, and strategic planning for your business.'
 
-  # Terms of service
-  termsOfService:
-    externalUrl: 'https://librechat.ai/tos'
-    openNewTab: true
-    modalAcceptance: true
-    modalTitle: 'Terms of Service for LibreChat'
-    modalContent: |
-      # Terms and Conditions for LibreChat
-
-      *Effective Date: February 18, 2024*
-
-      Welcome to LibreChat! By using this service, you agree to these terms.
-
-      ## 1. Usage Terms
-      - Use this service responsibly and ethically
-      - Do not violate any applicable laws or regulations
-      - Respect other users and maintain appropriate conduct
-
-      ## 2. Data and Privacy
-      - Your conversations may be stored for service improvement
-      - We respect your privacy and follow data protection standards
-      - You can request data deletion at any time
-
-      ## 3. Service Availability
-      - We strive to maintain high uptime but cannot guarantee 100% availability
-      - Features may be added, modified, or removed with notice
-
-      ## 4. Contact
-      For questions about these terms, please contact the administrator.
-
-  endpointsMenu: true
-  modelSelect: true
-  parameters: true
+  # Simplified UI for consulting use case
+  modelSelect: false        # Hide model selector
+  endpointsMenu: false      # Hide endpoint selector
+  parameters: false         # Hide model parameters
   sidePanel: true
-  presets: true
+  presets: false
   prompts: true
   bookmarks: true
-  multiConvo: true
-  agents: true
+  multiConvo: false
+  fileSearch: true
+  agents: false
+  memories: true           # Enable memories feature
+  temporaryChat: true      # Enable temporary chat
+  runCode: true            # Enable code execution
+  webSearch: true          # Enable web search
+
   peoplePicker:
-    users: true
-    groups: true
-    roles: true
+    users: false
+    groups: false
+    roles: false
+
   marketplace:
-      use: false
+    use: false
+
   fileCitations: true
 
 # Registration settings
 registration:
-  socialLogins: ['github', 'google', 'discord', 'openid']
-  # allowedDomains:
-  # - "gmail.com"
-  # - "yourdomain.com"
-
-# Example Balance settings (uncomment to enable)
-# balance:
-#   enabled: false
-#   startBalance: 20000
-#   autoRefillEnabled: false
-#   refillIntervalValue: 30
-#   refillIntervalUnit: 'days'
-#   refillAmount: 10000
-
-# Speech configuration (uncomment to enable)
-# speech:
-#   tts:
-#     openai:
-#       url: ''
-#       apiKey: '${TTS_API_KEY}'
-#       model: 'tts-1'
-#       voices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
-#   stt:
-#     openai:
-#       url: ''
-#       apiKey: '${STT_API_KEY}'
-#       model: 'whisper-1'
-
-# Rate limiting configuration (uncomment to enable)
-# rateLimits:
-#   fileUploads:
-#     ipMax: 100
-#     ipWindowInMinutes: 60
-#     userMax: 50
-#     userWindowInMinutes: 60
-#   conversationsImport:
-#     ipMax: 100
-#     ipWindowInMinutes: 60
-#     userMax: 50
-#     userWindowInMinutes: 60
+  socialLogins: []  # Disable social logins for consulting use case
 
 # Actions configuration
 actions:
   allowedDomains:
-    - 'swapi.dev'
-    - 'librechat.ai'
-    - 'google.com'
+    - 'severalxconsulting.com'
     - 'api.github.com'
-    - 'httpbin.org'
-
-# MCP Servers Configuration
-# Configure your Model Context Protocol servers here
-mcpServers:
-  # File system MCP server - provides file operations
-  filesystem:
-    type: stdio
-    command: npx
-    args:
-      - -y
-      - "@modelcontextprotocol/server-filesystem"
-      - /app/uploads  # Adjust path as needed
-    timeout: 60000
-    startup: true
-    chatMenu: true
-    serverInstructions: true
-    
-  # Web scraping MCP server - provides web browsing capabilities
-  puppeteer:
-    type: stdio
-    command: npx
-    args:
-      - -y
-      - "@modelcontextprotocol/server-puppeteer"
-    timeout: 300000
-    startup: true
-    chatMenu: true
-    serverInstructions: "Use this server for web scraping and browser automation tasks."
-    
-  # Notion MCP server - provides Notion workspace integration
-  notion:
-    type: stdio
-    command: npx
-    args:
-      - -y
-      - "@modelcontextprotocol/server-notion"
-    timeout: 60000
-    startup: true
-    chatMenu: true
-    serverInstructions: "Use this server to read, write, and manage your Notion pages and databases."
-    env:
-      NOTION_API_KEY: ${NOTION_API_KEY}
-    customUserVars:
-      - key: "NOTION_API_KEY"
-        label: "Notion Integration Token"
-        description: "Your Notion integration token for API access"
-        required: true
-  # Example: Custom MCP server via HTTP/SSE
-  # custom-server:
-  #   type: sse
-  #   url: ${MCP_SERVER_URL}
-  #   timeout: 60000
-  #   startup: true
-  #   chatMenu: true
-  #   serverInstructions: "Custom MCP server for specialized tasks."
-  #   customUserVars:
-  #     - key: "API_KEY"
-  #       label: "API Key"
-  #       description: "Your API key for the custom server"
-  #       required: true
-  
-  # Example: Obsidian MCP server (uncomment if you use Obsidian)
-  # obsidian:
-  #   type: stdio
-  #   command: npx
-  #   args:
-  #     - -y
-  #     - "mcp-obsidian"
-  #     - /path/to/your/obsidian/vault
-  #   timeout: 60000
-  #   startup: true
-  #   chatMenu: true
-  #   serverInstructions: "Access and manage your Obsidian vault."
-
-# Custom endpoints configuration
-endpoints:
-  # Assistants endpoint configuration
-  # assistants:
-  #   disableBuilder: false
-  #   pollIntervalMs: 3000
-  #   timeoutMs: 180000
-  #   retrievalModels: ["gpt-4-turbo-preview"]
-  #   capabilities: ["code_interpreter", "retrieval", "actions", "tools", "image_vision"]
-
-  # Agents endpoint configuration
-  # agents:
-  #   recursionLimit: 50
-  #   maxRecursionLimit: 100
-  #   disableBuilder: false
-  #   maxCitations: 30
-  #   maxCitationsPerFile: 7
-  #   minRelevanceScore: 0.45
-  #   capabilities: ["execute_code", "file_search", "actions", "tools"]
-
-  # Custom endpoint examples
-  custom:
-    # OpenAI-compatible endpoint
-    - name: 'OpenAI'
-      apiKey: '${OPENAI_API_KEY}'
-      baseURL: 'https://api.openai.com/v1'
-      models:
-        default: ['gpt-4', 'gpt-4-turbo-preview', 'gpt-3.5-turbo']
-        fetch: false
-      titleConvo: true
-      titleModel: 'gpt-3.5-turbo'
-      modelDisplayLabel: 'OpenAI'
-
-    # Anthropic endpoint
-    - name: 'Anthropic'
-      apiKey: '${ANTHROPIC_API_KEY}'
-      baseURL: 'https://api.anthropic.com'
-      models:
-        default: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307']
-        fetch: false
-      titleConvo: true
-      titleModel: 'claude-3-haiku-20240307'
-      modelDisplayLabel: 'Claude'
-
-    # Example: Local Ollama endpoint
-    # - name: 'Ollama'
-    #   apiKey: 'dummy-key'
-    #   baseURL: 'http://localhost:11434/v1'
-    #   models:
-    #     default: ['llama2', 'codellama', 'mistral']
-    #     fetch: true
-    #   titleConvo: true
-    #   titleModel: 'llama2'
-    #   modelDisplayLabel: 'Ollama'
 
 # File configuration
 fileConfig:
   endpoints:
-    assistants:
-      fileLimit: 5
-      fileSizeLimit: 10  # MB
-      totalSizeLimit: 50  # MB
-      supportedMimeTypes:
-        - "image/.*"
-        - "application/pdf"
-        - "text/.*"
-    openAI:
-      fileLimit: 10
-      fileSizeLimit: 25  # MB
-      totalSizeLimit: 100  # MB
     default:
       totalSizeLimit: 20  # MB
   serverFileSizeLimit: 100  # MB
@@ -270,15 +55,34 @@ fileConfig:
     percentage: 100
     px: 1024
 
-# Memory configuration for user memories (uncomment to enable)
-# memory:
-#   disabled: false
-#   validKeys: ["preferences", "work_info", "personal_info", "skills", "interests", "context"]
-#   tokenLimit: 10000
-#   personalize: true
-#   agent:
-#     provider: "openai"
-#     model: "gpt-4o-mini"
-#     instructions: "You are a memory management assistant. Store and manage user information accurately."
-#     model_parameters:
-#       temperature: 0.1
+endpoints:
+  openAI:
+    order: 1
+    type: openAI
+    userProvide: false
+
+modelSpecs:
+  prioritize: true
+  addedEndpoints:
+    - openAI
+  list:
+    - name: severalx-default-openai
+      label: SeveralX Assistant
+      default: true
+      preset:
+        endpoint: openAI
+        model: gpt-4o-mini
+        temperature: 0.7
+
+mcpServers:
+  notion:
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-notion"
+    timeout: 60000
+    chatMenu: true
+    customUserVars:
+      NOTION_API_KEY:
+        title: "Notion Integration Token"
+        description: "Create an integration in Notion and paste the shared token here so LibreChat can access your workspace."

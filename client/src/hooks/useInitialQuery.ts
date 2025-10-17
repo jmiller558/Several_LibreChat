@@ -28,8 +28,14 @@ export const useInitialQuery = (setText: (text: string) => void) => {
   };
 
   const clearCookie = (name: string) => {
-    const domain = window.location.hostname;
-    document.cookie = `${name}=; Max-Age=0; path=/; domain=${domain}; SameSite=Lax`;
+    const hostname = window.location.hostname;
+    const parts = hostname.split('.');
+    document.cookie = `${name}=; Max-Age=0; path=/; domain=${hostname}; SameSite=Lax`;
+
+    if (parts.length > 2) {
+      const baseDomain = parts.slice(-2).join('.');
+      document.cookie = `${name}=; Max-Age=0; path=/; domain=.${baseDomain}; SameSite=Lax`;
+    }
   };
 
   useEffect(() => {
