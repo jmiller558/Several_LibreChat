@@ -16,7 +16,7 @@ const knownEndpointAssets = {
   [KnownEndpoints.mistral]: 'assets/mistral.png',
   [KnownEndpoints.mlx]: 'assets/mlx.png',
   [KnownEndpoints.ollama]: 'assets/ollama.png',
-  [KnownEndpoints.openai]: 'assets/openai.svg',
+  [KnownEndpoints.openai]: 'assets/logo.png',
   [KnownEndpoints.openrouter]: 'assets/openrouter.png',
   [KnownEndpoints.perplexity]: 'assets/perplexity.png',
   [KnownEndpoints.qwen]: 'assets/qwen.svg',
