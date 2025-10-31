@@ -60,6 +60,7 @@ endpoints:
     order: 1
     type: openAI
     userProvide: false
+    iconURL: '/assets/logo.png'
 
 modelSpecs:
   prioritize: true
@@ -67,11 +68,14 @@ modelSpecs:
     - openAI
   list:
     - name: severalx-default-openai
-      label: SeveralX Assistant
+      label: SeveralX Consulting AI
+      iconURL: '/assets/logo.png'
       default: true
       preset:
         endpoint: openAI
         model: gpt-4o-mini
+        modelLabel: SeveralX Consulting AI
+        chatGptLabel: SeveralX Consulting AI
         temperature: 0.7
 
 mcpServers:
